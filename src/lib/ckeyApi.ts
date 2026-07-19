@@ -107,7 +107,7 @@ export interface BreakdownResponse {
   trend: TrendPoint[];
 }
 
-export type RangeKey = '7d' | '30d' | '90d';
+export type RangeKey = 'today' | '7d' | '30d';
 
 // ---- Fetch helpers ----
 
@@ -225,8 +225,47 @@ export function formatCompact(n: number): string {
   return `${n}`;
 }
 
-/** Strip the "owner/" prefix from a model name for display. */
-export function shortModelName(modelName: string): string {
+export interface ModelDisplay {
+  /** The provider prefix before "/", kept verbatim (e.g. "thanhnhan9023"), or null. */
+  provider: string | null;
+  /** The normalized, human-readable model name (e.g. "claude opus 4.8"). */
+  name: string;
+}
+
+/**
+ * Normalize the model portion for display:
+ *  - hyphens become spaces:            claude-haiku-4.5  -> claude haiku 4.5
+ *  - split version parts rejoin:       ...-4-8...        -> ...4.8...
+ *  - trailing variant tags are dropped: claude-opus-4-8-kiro -> claude opus 4.8
+ */
+function normalizeModelLabel(model: string): string {
+  const tokens = model.split('-');
+
+  // Merge adjacent bare-number tokens into a dotted version (4-8 -> 4.8).
+  const merged: string[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    const next = tokens[i + 1];
+    if (/^\d+$/.test(t) && next !== undefined && /^\d+$/.test(next)) {
+      merged.push(`${t}.${next}`);
+      i++;
+      continue;
+    }
+    merged.push(t);
+  }
+
+  // Drop purely-alphabetic tokens that trail the version number (e.g. "kiro").
+  const versionIdx = merged.findIndex((t) => /\d/.test(t));
+  const cleaned =
+    versionIdx >= 0 ? merged.filter((t, i) => i <= versionIdx || /\d/.test(t)) : merged;
+
+  return cleaned.join(' ');
+}
+
+/** Split "owner/model-name" into a kept provider and a normalized model label. */
+export function formatModelName(modelName: string): ModelDisplay {
   const slash = modelName.indexOf('/');
-  return slash >= 0 ? modelName.slice(slash + 1) : modelName;
+  const provider = slash >= 0 ? modelName.slice(0, slash) : null;
+  const rawModel = slash >= 0 ? modelName.slice(slash + 1) : modelName;
+  return { provider, name: normalizeModelLabel(rawModel) };
 }

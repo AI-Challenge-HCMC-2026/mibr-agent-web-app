@@ -5,7 +5,7 @@ import {
   fetchBreakdown,
   formatVND,
   formatCompact,
-  shortModelName,
+  formatModelName,
   UnauthorizedError,
   type StreamResponse,
   type BreakdownResponse,
@@ -14,10 +14,21 @@ import {
 import './Usage.css';
 
 const RANGE_PRESETS: { key: RangeKey; label: string }[] = [
+  { key: 'today', label: 'Hôm nay' },
   { key: '7d', label: '7 ngày' },
   { key: '30d', label: '30 ngày' },
-  { key: '90d', label: '90 ngày' },
 ];
+
+/** Render a model as "provider / normalized name", keeping the provider muted. */
+const ModelName: React.FC<{ modelName: string }> = ({ modelName }) => {
+  const { provider, name } = formatModelName(modelName);
+  return (
+    <span className="model-name" title={modelName}>
+      {provider && <span className="model-provider">{provider}</span>}
+      <span className="model-label">{name}</span>
+    </span>
+  );
+};
 
 const Usage: React.FC = () => {
   const navigate = useNavigate();
@@ -205,6 +216,7 @@ const Usage: React.FC = () => {
       <div className={`analytics ${loading ? 'is-loading' : ''}`}>
         {view === 'chart' ? (
           <>
+            {range !== 'today' && (
             <figure className="chart-card">
               <figcaption>
                 <span className="chart-title">Chi phí theo ngày</span>
@@ -267,6 +279,7 @@ const Usage: React.FC = () => {
                 </div>
               )}
             </figure>
+            )}
 
             <figure className="chart-card">
               <figcaption>
@@ -280,8 +293,8 @@ const Usage: React.FC = () => {
                 <div className="bar-list">
                   {models.map((m) => (
                     <div className="bar-row" key={m.model_name}>
-                      <div className="bar-label" title={m.model_name}>
-                        {shortModelName(m.model_name)}
+                      <div className="bar-label">
+                        <ModelName modelName={m.model_name} />
                         <span className="bar-meta">
                           {m.total_requests} req · {formatCompact(m.total_tokens)} tok
                         </span>
@@ -317,7 +330,7 @@ const Usage: React.FC = () => {
                 <tbody>
                   {models.map((m) => (
                     <tr key={m.model_name}>
-                      <td title={m.model_name}>{shortModelName(m.model_name)}</td>
+                      <td><ModelName modelName={m.model_name} /></td>
                       <td className="num">{m.total_requests}</td>
                       <td className="num">{formatCompact(m.total_tokens)}</td>
                       <td className="num">{formatCompact(m.cache_read_tokens)}</td>
@@ -355,7 +368,7 @@ const Usage: React.FC = () => {
                 {stream.logs.map((log) => (
                   <tr key={log.id}>
                     <td className="nowrap">{log.created_at_text}</td>
-                    <td title={log.model_name}>{shortModelName(log.model_name)}</td>
+                    <td><ModelName modelName={log.model_name} /></td>
                     <td className="num">{formatCompact(log.total_tokens)}</td>
                     <td className="num strong">{formatVND(log.charged_vnd)}</td>
                     <td className="num">{(log.latency_ms / 1000).toFixed(1)}s</td>
@@ -387,7 +400,7 @@ function niceMax(v: number): number {
 }
 
 function rangeLabel(range: RangeKey): string {
-  return range === '7d' ? '7 ngày qua' : range === '30d' ? '30 ngày qua' : '90 ngày qua';
+  return range === 'today' ? 'hôm nay' : range === '7d' ? '7 ngày qua' : '30 ngày qua';
 }
 
 export default Usage;
