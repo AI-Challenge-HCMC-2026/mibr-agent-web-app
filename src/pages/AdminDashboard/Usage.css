@@ -1,0 +1,477 @@
+/* =============================================
+   Usage page — Claude dark theme + dataviz roles
+   ============================================= */
+
+.usage-page {
+  --viz-surface: #30302e;
+  --viz-series-1: #3987e5; /* single-series blue (dataviz slot 1) */
+
+  --bg: #262624;
+  --bg-panel: #30302e;
+  --bg-input: #3a3a38;
+  --bg-hover: #45443f;
+  --text-primary: #f2f0ec;
+  --text-secondary: #b7b4ac;
+  --text-muted: #8c8a83;
+  --border: rgba(255, 255, 255, 0.06);
+  --accent: #c96442;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --fail: #e66767;
+
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 40px 28px 56px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-page * {
+  box-sizing: border-box;
+}
+
+/* ---- Header ---- */
+
+.usage-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.usage-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text-primary);
+  font-variant-numeric: proportional-nums;
+}
+
+.usage-subtitle {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 0;
+}
+
+.health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--good);
+  flex-shrink: 0;
+}
+
+.health-badge.offline .health-dot {
+  background: var(--fail);
+}
+
+.health-http {
+  color: var(--text-muted);
+}
+
+/* ---- KPI cards ---- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.kpi-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.kpi-card.accent {
+  border-color: rgba(201, 100, 66, 0.35);
+  background: linear-gradient(180deg, rgba(201, 100, 66, 0.08), transparent 70%), var(--bg-panel);
+}
+
+.kpi-label {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.kpi-value {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+  font-variant-numeric: proportional-nums;
+  line-height: 1.2;
+}
+
+.kpi-sub {
+  font-size: 12px;
+  margin-top: 6px;
+  color: var(--text-muted);
+}
+
+.kpi-sub.good {
+  color: var(--good);
+}
+
+.kpi-sub.warn {
+  color: var(--warn);
+}
+
+/* ---- Filters ---- */
+
+.usage-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.range-group,
+.view-toggle {
+  display: flex;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.range-btn,
+.view-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  font-family: inherit;
+}
+
+.range-btn:hover,
+.view-toggle button:hover {
+  color: var(--text-primary);
+}
+
+.range-btn.active,
+.view-toggle button.active {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+/* ---- Error / loading / empty ---- */
+
+.usage-error {
+  background: rgba(230, 103, 103, 0.1);
+  border: 1px solid rgba(230, 103, 103, 0.3);
+  color: #f0a6a6;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-size: 13.5px;
+  margin-bottom: 20px;
+}
+
+.usage-loading {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  padding: 24px 0;
+  text-align: center;
+}
+
+.empty-state {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  text-align: center;
+  padding: 48px 0;
+}
+
+.analytics {
+  transition: opacity 0.2s ease;
+}
+
+.analytics.is-loading {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ---- Chart card ---- */
+
+.chart-card {
+  margin: 0 0 20px;
+  background: var(--viz-surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+}
+
+.chart-card figcaption {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.chart-caption {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ---- Area chart (single series) ---- */
+
+.cost-chart {
+  width: 100%;
+  height: 260px;
+  display: block;
+}
+
+.cost-chart .gridline {
+  stroke: rgba(255, 255, 255, 0.07);
+  stroke-width: 1;
+}
+
+.cost-chart .axis-tick {
+  fill: var(--text-muted);
+  font-size: 11px;
+  font-family: inherit;
+}
+
+.cost-chart .area-fill {
+  fill: var(--viz-series-1);
+  opacity: 0.12;
+}
+
+.cost-chart .area-edge {
+  fill: none;
+  stroke: var(--viz-series-1);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.cost-chart .point {
+  fill: var(--viz-series-1);
+  stroke: var(--viz-surface);
+  stroke-width: 2;
+  transition: r 0.1s ease;
+}
+
+.cost-chart .crosshair {
+  stroke: rgba(255, 255, 255, 0.35);
+  stroke-width: 1;
+  pointer-events: none;
+}
+
+/* ---- Tooltip ---- */
+
+.chart-tooltip {
+  margin-top: 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 200px;
+}
+
+.tooltip-date {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+}
+
+.tooltip-key {
+  color: var(--text-secondary);
+}
+
+.tooltip-val {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ---- Bar list (cost by model) ---- */
+
+.bar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 0;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.bar-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-meta {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.bar-track {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bar-fill {
+  height: 22px;
+  border-radius: 4px;
+  min-width: 2px;
+  max-width: calc(100% - 90px);
+  background: var(--viz-series-1);
+  transition: width 0.3s ease;
+}
+
+.bar-value {
+  font-size: 13px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ---- Tables ---- */
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.usage-table th,
+.usage-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.usage-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 11.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.usage-table td {
+  color: var(--text-secondary);
+}
+
+.usage-table .num {
+  text-align: right;
+}
+
+.usage-table .nowrap {
+  white-space: nowrap;
+}
+
+.usage-table .strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.usage-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+/* ---- Status badge ---- */
+
+.status-badge {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.status-badge.ok {
+  color: #7fd68a;
+  background: rgba(12, 163, 12, 0.14);
+}
+
+.status-badge.fail {
+  color: #f0a6a6;
+  background: rgba(230, 103, 103, 0.14);
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 860px) {
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .usage-page {
+    padding: 28px 16px 40px;
+  }
+  .kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .usage-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .bar-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .bar-fill {
+    max-width: calc(100% - 90px);
+  }
+}

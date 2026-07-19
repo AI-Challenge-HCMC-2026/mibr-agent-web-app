@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import './Chat.css';
 
 interface Message {
@@ -12,11 +13,6 @@ interface ChatSession {
   id: string;
   title: string;
   messages: Message[];
-}
-
-interface ChatProps {
-  userEmail?: string;
-  onLogout?: () => void;
 }
 
 const INITIAL_SESSIONS: ChatSession[] = [
@@ -88,7 +84,10 @@ MCP giúp việc tích hợp các công cụ bên ngoài trở nên cắm-là-ch
   },
 ];
 
-export const Chat: React.FC<ChatProps> = ({ userEmail = 'user@example.com', onLogout }) => {
+export const Chat: React.FC = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const userEmail = (location.state as { email?: string } | null)?.email ?? 'user@example.com';
   const [sessions, setSessions] = useState<ChatSession[]>(INITIAL_SESSIONS);
   const [activeSessionId, setActiveSessionId] = useState<string>('session-1');
   const [inputMessage, setInputMessage] = useState('');
@@ -271,10 +270,10 @@ export const Chat: React.FC<ChatProps> = ({ userEmail = 'user@example.com', onLo
             </div>
             <div className="plan">Free plan</div>
           </div>
-          <div 
-            className="footer-icon" 
+          <div
+            className="footer-icon"
             title="Log out"
-            onClick={onLogout}
+            onClick={() => navigate('/')}
           >
             {/* Logout icon */}
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

@@ -1,28 +1,21 @@
-import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login/Login';
 import Chat from './pages/Chat/Chat';
+import AdminLogin from './pages/AdminLogin/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard/AdminDashboard';
 
 function App() {
-  const [currentView, setCurrentView] = useState<'login' | 'chat'>('login');
-  const [userEmail, setUserEmail] = useState('');
-
-  const handleLoginSuccess = (email: string) => {
-    setUserEmail(email);
-    setCurrentView('chat');
-  };
-
-  const handleLogout = () => {
-    setUserEmail('');
-    setCurrentView('login');
-  };
-
-  if (currentView === 'login') {
-    return (
-      <Login onLoginSuccess={handleLoginSuccess} />
-    );
-  }
-
-  return <Chat userEmail={userEmail} onLogout={handleLogout} />;
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/chat" element={<Chat />} />
+        <Route path="/admin" element={<AdminLogin />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
 export default App;

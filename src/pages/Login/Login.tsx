@@ -1,11 +1,9 @@
 import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
-interface LoginProps {
-  onLoginSuccess?: (email: string) => void;
-}
-
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
+const Login: React.FC = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -29,14 +27,12 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     // Mock authentication process
     setTimeout(() => {
       setIsLoading(false);
-      if (onLoginSuccess) {
-        onLoginSuccess(email);
-      }
+      navigate('/chat', { state: { email } });
     }, 1000);
   };
 
   const handleGoogleLogin = () => {
-    if (onLoginSuccess) onLoginSuccess('google-user@example.com');
+    navigate('/chat', { state: { email: 'google-user@example.com' } });
   };
 
   return (
