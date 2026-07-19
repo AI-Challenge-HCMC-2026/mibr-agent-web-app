@@ -1,19 +1,18 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import './Login.css';
 
 interface LoginProps {
   onLoginSuccess?: (email: string) => void;
-  onSignUpClick?: () => void;
 }
 
-export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSignUpClick }) => {
+export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -36,6 +35,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSignUpClick }) =
     }, 1000);
   };
 
+  const handleGoogleLogin = () => {
+    if (onLoginSuccess) onLoginSuccess('google-user@example.com');
+  };
+
   return (
     <div className="page-login-wrapper">
       <div className="login-wrap">
@@ -47,18 +50,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSignUpClick }) =
 
           <form onSubmit={handleSubmit}>
             {error && (
-              <div 
-                style={{ 
-                  color: '#ea4335', 
-                  backgroundColor: 'rgba(234, 67, 53, 0.1)', 
-                  padding: '10px', 
-                  borderRadius: '6px', 
-                  marginBottom: '16px',
-                  fontSize: '13px',
-                  textAlign: 'center',
-                  border: '1px solid rgba(234, 67, 53, 0.2)'
-                }}
-              >
+              <div className="error-banner">
                 {error}
               </div>
             )}
@@ -97,9 +89,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSignUpClick }) =
                 />
                 Remember me
               </label>
-              <a 
-                href="#forgot" 
-                className="forgot" 
+              <a
+                href="#forgot"
+                className="forgot"
                 onClick={(e) => {
                   e.preventDefault();
                   alert('Password recovery simulated.');
@@ -114,52 +106,23 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSignUpClick }) =
             </button>
           </form>
 
-          <div className="divider">or continue with</div>
+          <div className="divider">OR</div>
 
-          <button 
-            className="btn-secondary" 
+          <button
+            className="btn-google"
             type="button"
-            onClick={() => {
-              if (onLoginSuccess) onLoginSuccess('google-user@example.com');
-            }}
+            onClick={handleGoogleLogin}
             disabled={isLoading}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24">
-              <path 
-                fill="#EA4335" 
-                d="M12 10.2v3.9h5.5c-.24 1.4-1.7 4.1-5.5 4.1-3.3 0-6-2.7-6-6.2s2.7-6.2 6-6.2c1.9 0 3.15.8 3.88 1.5l2.65-2.55C16.9 3.15 14.7 2.2 12 2.2 6.9 2.2 2.7 6.4 2.7 11.5S6.9 20.8 12 20.8c6.9 0 9.3-4.85 9.3-8.35 0-.55-.06-1-.14-1.45z"
-              />
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.0 24.0 0 0 0 0 21.56l7.98-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              <path fill="none" d="M0 0h48v48H0z"/>
             </svg>
             Continue with Google
           </button>
-          <button 
-            className="btn-secondary" 
-            type="button"
-            onClick={() => {
-              if (onLoginSuccess) onLoginSuccess('apple-user@example.com');
-            }}
-            disabled={isLoading}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path 
-                d="M16.365 1.43c0 1.14-.42 2.07-1.15 2.87-.83.9-2.06 1.6-3.2 1.5-.14-1.1.42-2.24 1.13-3 .82-.9 2.24-1.55 3.22-1.37zm3.83 16.4c-.5 1.15-.74 1.66-1.4 2.68-.92 1.4-2.22 3.15-3.83 3.16-1.43.02-1.8-.94-3.75-.93-1.95.01-2.36.95-3.79.93-1.6-.02-2.84-1.6-3.76-3-2.58-3.88-2.85-8.44-1.26-10.86 1.13-1.73 2.9-2.75 4.57-2.75 1.7 0 2.77 1 4.18 1 1.36 0 2.2-1 4.18-1 1.5 0 3.1.82 4.24 2.24-3.72 2.04-3.12 7.36.62 8.53z"
-              />
-            </svg>
-            Continue with Apple
-          </button>
-
-          <p className="footer-note">
-            Don't have an account?{' '}
-            <a 
-              href="#signup" 
-              onClick={(e) => {
-                e.preventDefault();
-                if (onSignUpClick) onSignUpClick();
-              }}
-            >
-              Sign up
-            </a>
-          </p>
         </div>
       </div>
     </div>

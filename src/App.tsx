@@ -18,10 +18,7 @@ function App() {
 
   if (currentView === 'login') {
     return (
-      <Login 
-        onLoginSuccess={handleLoginSuccess} 
-        onSignUpClick={() => alert('Sign up is not implemented in this mock.')} 
-      />
+      <Login onLoginSuccess={handleLoginSuccess} />
     );
   }
 
