@@ -355,6 +355,33 @@
   color: var(--text-muted);
 }
 
+/* ---- Model name (provider / normalized label) ---- */
+
+.model-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.model-provider {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.model-provider::after {
+  content: " /";
+  margin-left: 3px;
+}
+
+.model-label {
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .bar-track {
   position: relative;
   height: 22px;
