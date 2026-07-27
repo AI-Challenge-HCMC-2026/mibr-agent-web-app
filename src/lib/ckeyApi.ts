@@ -184,8 +184,18 @@ export interface DepositHistoryResponse {
 
 // ---- Fetch helpers & Admin Key storage ----
 
-const BASE = '/api/ckey';
+const CKEY_BASE_URL = (import.meta.env.VITE_CKEY_BASE_URL as string | undefined) || 'https://ckey.vn/api';
 const KEY_STORAGE = 'ckey_admin_key';
+
+export function getApiKey(): string {
+  return (import.meta.env.VITE_CKEY_APIKEY as string | undefined) || '';
+}
+
+function buildTargetUrl(path: string): string {
+  const apiKey = getApiKey();
+  const sep = path.includes('?') ? '&' : '?';
+  return `${CKEY_BASE_URL}${path}${apiKey ? `${sep}key=${encodeURIComponent(apiKey)}` : ''}`;
+}
 
 export class UnauthorizedError extends Error {
   constructor(message = 'Invalid or expired session. Please sign in again.') {
@@ -223,7 +233,7 @@ export function isAuthenticated(): boolean {
 }
 
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(buildTargetUrl(path), {
     headers: { accept: 'application/json', 'x-admin-key': getAdminKey() },
   });
 
@@ -250,7 +260,7 @@ async function getJSON<T>(path: string): Promise<T> {
 }
 
 export async function verifyAdminKey(candidate: string): Promise<void> {
-  const res = await fetch(`${BASE}/profile`, {
+  const res = await fetch(buildTargetUrl('/profile'), {
     headers: { accept: 'application/json', 'x-admin-key': candidate },
   });
   if (res.status === 401) {
