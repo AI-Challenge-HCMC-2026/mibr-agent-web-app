@@ -95,7 +95,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigateToDeposit, onNaviga
     <div className="overview-tab">
       <div className="tab-header">
         <div>
-          <h1>Ckey AI Overview</h1>
+          <h1>Overview</h1>
           <p className="tab-subtitle">Account management and AI consumption analytics</p>
         </div>
         <div className="header-actions">

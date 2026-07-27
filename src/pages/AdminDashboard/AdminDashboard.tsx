@@ -93,8 +93,7 @@ const AdminDashboard: React.FC = () => {
     <div className="page-admin-dashboard">
       <aside className="admin-sidebar">
         <div className="admin-brand">
-          <span className="brand-name">Ckey AI</span>
-          <span className="brand-badge">Dashboard</span>
+          <span className="brand-name">Admin Dashboard</span>
         </div>
 
         <nav className="admin-nav">
