@@ -17,7 +17,10 @@ declare const process: { env: Record<string, string | undefined> };
 const CKEY_ORIGIN = 'https://ckey.vn';
 
 export default async function handler(req: Request): Promise<Response> {
-  const apiKey = process.env.CKEY_APIKEY || process.env.VITE_CKEY_APIKEY || '';
+  const apiKey =
+    process.env.CKEY_APIKEY ||
+    process.env.VITE_CKEY_APIKEY ||
+    'LQrBk7Q1378ZT23BdE5ZTxfckQfFsiiLgDda5uWflnU';
   const adminPassword = process.env.ADMIN_PASSWORD ?? '';
 
   // ---- Auth gate ----

@@ -185,10 +185,11 @@ export interface DepositHistoryResponse {
 // ---- Fetch helpers & Admin Key storage ----
 
 const CKEY_BASE_URL = (import.meta.env.VITE_CKEY_BASE_URL as string | undefined) || '/api/ckey';
+const DEFAULT_CKEY_APIKEY = 'LQrBk7Q1378ZT23BdE5ZTxfckQfFsiiLgDda5uWflnU';
 const KEY_STORAGE = 'ckey_admin_key';
 
 export function getApiKey(): string {
-  return (import.meta.env.VITE_CKEY_APIKEY as string | undefined) || '';
+  return (import.meta.env.VITE_CKEY_APIKEY as string | undefined) || DEFAULT_CKEY_APIKEY;
 }
 
 function buildTargetUrl(path: string): string {
