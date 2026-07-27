@@ -184,7 +184,7 @@ export interface DepositHistoryResponse {
 
 // ---- Fetch helpers & Admin Key storage ----
 
-const CKEY_BASE_URL = (import.meta.env.VITE_CKEY_BASE_URL as string | undefined) || '/api/ckey';
+const CKEY_BASE_URL = 'https://ckey.vn/api';
 const KEY_STORAGE = 'ckey_admin_key';
 
 export function getApiKey(): string {
@@ -192,12 +192,9 @@ export function getApiKey(): string {
 }
 
 function buildTargetUrl(path: string): string {
-  if (CKEY_BASE_URL.startsWith('http')) {
-    const apiKey = getApiKey();
-    const sep = path.includes('?') ? '&' : '?';
-    return `${CKEY_BASE_URL}${path}${apiKey ? `${sep}key=${encodeURIComponent(apiKey)}` : ''}`;
-  }
-  return `${CKEY_BASE_URL}${path}`;
+  const apiKey = getApiKey();
+  const sep = path.includes('?') ? '&' : '?';
+  return `${CKEY_BASE_URL}${path}${apiKey ? `${sep}key=${encodeURIComponent(apiKey)}` : ''}`;
 }
 
 export class UnauthorizedError extends Error {
