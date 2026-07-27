@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { isAuthenticated, clearAdminKey } from '../../lib/ckeyApi';
-import Usage from './Usage';
+import OverviewTab from './OverviewTab';
+import HistoryTab from './HistoryTab';
+import KeysTab from './KeysTab';
+import DepositTab from './DepositTab';
 import './AdminDashboard.css';
 
-type NavKey = 'overview' | 'usage' | 'users' | 'settings' | 'logs';
+type NavKey = 'overview' | 'history' | 'keys' | 'deposit';
 
 interface NavItem {
   key: NavKey;
@@ -19,7 +22,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Overview',
     enabled: true,
     icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="9" rx="1" />
         <rect x="14" y="3" width="7" height="5" rx="1" />
         <rect x="14" y="12" width="7" height="9" rx="1" />
@@ -28,50 +31,34 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    key: 'usage',
-    label: 'Usage',
+    key: 'history',
+    label: 'History',
     enabled: true,
     icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M3 3v18h18" />
-        <path d="M7 14l4-4 3 3 5-6" />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
       </svg>
     ),
   },
   {
-    key: 'users',
-    label: 'Users',
-    enabled: false,
+    key: 'keys',
+    label: 'API Keys',
+    enabled: true,
     icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-        <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
       </svg>
     ),
   },
   {
-    key: 'settings',
-    label: 'Settings',
-    enabled: false,
+    key: 'deposit',
+    label: 'Deposit & Finance',
+    enabled: true,
     icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <circle cx="12" cy="12" r="3" />
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'logs',
-    label: 'Logs',
-    enabled: false,
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="8" y1="13" x2="16" y2="13" />
-        <line x1="8" y1="17" x2="13" y2="17" />
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <line x1="2" y1="10" x2="22" y2="10" />
       </svg>
     ),
   },
@@ -83,7 +70,7 @@ const AdminDashboard: React.FC = () => {
   const email = (location.state as { email?: string } | null)?.email ?? 'admin@example.com';
   const [active, setActive] = useState<NavKey>('overview');
 
-  // Route guard: redirect to login if there is no valid admin key.
+  // Route guard: redirect to login if there is no valid admin session key.
   useEffect(() => {
     if (!isAuthenticated()) {
       navigate('/admin', { replace: true });
@@ -106,8 +93,8 @@ const AdminDashboard: React.FC = () => {
     <div className="page-admin-dashboard">
       <aside className="admin-sidebar">
         <div className="admin-brand">
-          <span className="brand-name">Claude</span>
-          <span className="brand-badge">Admin</span>
+          <span className="brand-name">Ckey AI</span>
+          <span className="brand-badge">Dashboard</span>
         </div>
 
         <nav className="admin-nav">
@@ -119,11 +106,10 @@ const AdminDashboard: React.FC = () => {
               }`}
               onClick={() => handleNav(item)}
               disabled={!item.enabled}
-              title={item.enabled ? item.label : `${item.label} (coming soon)`}
+              title={item.label}
             >
               {item.icon}
               <span>{item.label}</span>
-              {!item.enabled && <span className="nav-soon">soon</span>}
             </button>
           ))}
         </nav>
@@ -146,42 +132,14 @@ const AdminDashboard: React.FC = () => {
 
       <div className="admin-body">
         {active === 'overview' && (
-          <main className="admin-main">
-            <h1>Dashboard</h1>
-            <p className="admin-subtitle">Welcome back. This is the admin control panel.</p>
-
-            <div className="admin-stats">
-              <div className="stat-card">
-                <div className="stat-label">Total users</div>
-                <div className="stat-value">1,284</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Active sessions</div>
-                <div className="stat-value">37</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">API calls today</div>
-                <div className="stat-value">9,402</div>
-              </div>
-            </div>
-
-            <div className="admin-placeholder">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="3" y="3" width="7" height="9" rx="1" />
-                <rect x="14" y="3" width="7" height="5" rx="1" />
-                <rect x="14" y="12" width="7" height="9" rx="1" />
-                <rect x="3" y="16" width="7" height="5" rx="1" />
-              </svg>
-              <h2>Dashboard content coming soon</h2>
-              <p>
-                This is a placeholder for the admin dashboard. Open <strong>Usage</strong> in the
-                sidebar to see model spend tracking.
-              </p>
-            </div>
-          </main>
+          <OverviewTab
+            onNavigateToDeposit={() => setActive('deposit')}
+            onNavigateToUsage={() => setActive('history')}
+          />
         )}
-
-        {active === 'usage' && <Usage />}
+        {active === 'history' && <HistoryTab />}
+        {active === 'keys' && <KeysTab />}
+        {active === 'deposit' && <DepositTab />}
       </div>
     </div>
   );

@@ -5,21 +5,20 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   // Load .env (all keys, not just VITE_*) so secrets stay server-side.
   const env = loadEnv(mode, process.cwd(), '')
-  const cookie = env.CKEY_COOKIE ?? ''
+  const apiKey = env.CKEY_APIKEY ?? ''
   const adminPassword = env.ADMIN_PASSWORD ?? ''
 
   return {
     plugins: [react()],
     server: {
       proxy: {
-        // Browser calls /api/ckey/<path> ; we forward to ckey.vn/ajax/<path>
-        // with the auth cookie injected server-side so it never reaches the
-        // client. Mirrors the Vercel edge function in api/ckey/[...path].ts.
+        // Browser calls /api/ckey/<path> ; we forward to ckey.vn/api/<path>?key=<apiKey>
+        // with the API key injected server-side so it never reaches the client.
         '/api/ckey': {
           target: 'https://ckey.vn',
           changeOrigin: true,
           secure: true,
-          rewrite: (path) => path.replace(/^\/api\/ckey/, '/ajax'),
+          rewrite: (path) => path.replace(/^\/api\/ckey/, '/api'),
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq, req, res) => {
               // Same auth gate as production: require a matching x-admin-key.
@@ -31,10 +30,11 @@ export default defineConfig(({ mode }) => {
                 proxyReq.destroy()
                 return
               }
-              if (cookie) proxyReq.setHeader('cookie', cookie)
-              // ckey.vn only serves same-origin XHR — spoof the browser context.
-              proxyReq.setHeader('referer', 'https://ckey.vn/api-ai-dashboard')
-              proxyReq.setHeader('origin', 'https://ckey.vn')
+              if (apiKey) {
+                const currentPath = proxyReq.path || ''
+                const sep = currentPath.includes('?') ? '&' : '?'
+                proxyReq.path = `${currentPath}${sep}key=${encodeURIComponent(apiKey)}`
+              }
               proxyReq.setHeader('accept', 'application/json')
               proxyReq.setHeader(
                 'user-agent',
@@ -47,3 +47,4 @@ export default defineConfig(({ mode }) => {
     },
   }
 })
+

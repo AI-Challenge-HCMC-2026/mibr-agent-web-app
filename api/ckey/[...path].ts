@@ -4,22 +4,18 @@
    Mirrors the Vite dev proxy (see vite.config.ts) so the client's
    /api/ckey/* calls work identically in local dev and on Vercel.
 
-   - Injects the auth cookie server-side (from the CKEY_COOKIE env var),
+   - Injects the API key server-side (from CKEY_APIKEY env var),
      so it never reaches the browser.
    - Gates access behind ADMIN_PASSWORD: the client must send a matching
-     `x-admin-key` header, obtained by logging in. This stops anyone from
-     hitting /api/ckey/* directly without signing in.
+     `x-admin-key` header, obtained by logging in.
    ============================================================= */
 
 export const config = { runtime: 'edge' };
 
-// Only these ckey.vn ajax endpoints may be proxied.
-const ALLOWED_PATHS = new Set(['apiai-stream', 'apiai-usage-breakdown']);
-
 const CKEY_ORIGIN = 'https://ckey.vn';
 
 export default async function handler(req: Request): Promise<Response> {
-  const cookie = process.env.CKEY_COOKIE ?? '';
+  const apiKey = process.env.CKEY_APIKEY ?? '';
   const adminPassword = process.env.ADMIN_PASSWORD ?? '';
 
   // ---- Auth gate ----
@@ -30,29 +26,31 @@ export default async function handler(req: Request): Promise<Response> {
   if (key !== adminPassword) {
     return json({ error: 'Không có quyền truy cập.' }, 401);
   }
-  if (!cookie) {
-    return json({ error: 'Server chưa cấu hình CKEY_COOKIE.' }, 500);
+  if (!apiKey) {
+    return json({ error: 'Server chưa cấu hình CKEY_APIKEY.' }, 500);
   }
 
   // ---- Resolve the target path from /api/ckey/<path> ----
   const url = new URL(req.url);
   const sub = url.pathname.replace(/^\/api\/ckey\//, '').replace(/^\/+|\/+$/g, '');
-  if (!ALLOWED_PATHS.has(sub)) {
-    return json({ error: `Endpoint không được phép: ${sub}` }, 404);
+
+  if (!sub) {
+    return json({ error: 'Path không hợp lệ.' }, 400);
   }
 
-  const target = `${CKEY_ORIGIN}/ajax/${sub}${url.search}`;
+  const targetUrl = new URL(`${CKEY_ORIGIN}/api/${sub}`);
+  url.searchParams.forEach((val, name) => {
+    targetUrl.searchParams.set(name, val);
+  });
+  targetUrl.searchParams.set('key', apiKey);
 
-  // ---- Forward to ckey.vn with the auth cookie ----
+  // ---- Forward to ckey.vn ----
   let upstream: Response;
   try {
-    upstream = await fetch(target, {
+    upstream = await fetch(targetUrl.toString(), {
       method: 'GET',
       headers: {
-        cookie,
         accept: 'application/json',
-        referer: `${CKEY_ORIGIN}/api-ai-dashboard`,
-        origin: CKEY_ORIGIN,
         'user-agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
       },
@@ -63,9 +61,8 @@ export default async function handler(req: Request): Promise<Response> {
 
   const ct = upstream.headers.get('content-type') ?? '';
   if (!ct.includes('application/json')) {
-    // A login redirect / HTML error page means the cookie has expired.
     return json(
-      { error: 'Cookie ckey.vn có thể đã hết hạn. Cập nhật CKEY_COOKIE rồi redeploy.' },
+      { error: 'Phản hồi từ ckey.vn không phải JSON. Vui lòng kiểm tra lại CKEY_APIKEY.' },
       502,
     );
   }
@@ -86,3 +83,4 @@ function json(payload: unknown, status: number): Response {
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
   });
 }
+
