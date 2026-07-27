@@ -192,12 +192,13 @@ export function getApiKey(): string {
 }
 
 function buildTargetUrl(path: string): string {
-  if (CKEY_BASE_URL.startsWith('http')) {
-    const apiKey = getApiKey();
-    const sep = path.includes('?') ? '&' : '?';
-    return `${CKEY_BASE_URL}${path}${apiKey ? `${sep}key=${encodeURIComponent(apiKey)}` : ''}`;
+  const apiKey = getApiKey();
+  const target = `${CKEY_BASE_URL}${path}`;
+  if (apiKey && !target.includes('key=')) {
+    const sep = target.includes('?') ? '&' : '?';
+    return `${target}${sep}key=${encodeURIComponent(apiKey)}`;
   }
-  return `${CKEY_BASE_URL}${path}`;
+  return target;
 }
 
 export class UnauthorizedError extends Error {
