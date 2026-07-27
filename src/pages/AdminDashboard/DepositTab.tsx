@@ -137,7 +137,7 @@ const DepositTab: React.FC = () => {
             <ol className="instructions-list">
               <li>Open your mobile Banking Application.</li>
               <li>Transfer funds with the exact <strong>Transfer Content</strong> below or scan the VietQR code.</li>
-              <li>Your account balance on ckey.vn will be automatically updated within 1-3 minutes.</li>
+              <li>Your account balance will be automatically updated within 1-3 minutes.</li>
             </ol>
 
             <div className="transfer-content-box">

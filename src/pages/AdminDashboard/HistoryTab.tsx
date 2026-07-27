@@ -150,8 +150,8 @@ const HistoryTab: React.FC = () => {
                   <th>Request ID</th>
                   <th>Time</th>
                   <th>Model</th>
-                  <th className="num">Prompt Tok</th>
-                  <th className="num">Comp Tok</th>
+                  <th className="num">Input Tok</th>
+                  <th className="num">Output Tok</th>
                   <th className="num">Total Tok</th>
                   <th className="num">Cost</th>
                   <th className="num">Latency</th>
