@@ -133,6 +133,74 @@
   color: var(--warn);
 }
 
+/* ---- Input / output token cards ---- */
+
+.token-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.token-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.token-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+}
+
+.token-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 6px;
+}
+
+.token-badge.input {
+  color: #9cc4f0;
+  background: rgba(57, 135, 229, 0.16);
+}
+
+.token-badge.output {
+  color: #e9b083;
+  background: rgba(201, 100, 66, 0.16);
+}
+
+.token-title {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.token-cost {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.token-cost-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.token-cost-val {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
 /* ---- Filters ---- */
 
 .usage-filters {
@@ -333,26 +401,28 @@
 }
 
 .bar-row {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  align-items: center;
-  gap: 16px;
-}
-
-.bar-label {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 7px;
+}
+
+/* Name + request/token meta share one full-width line above the bar, so a long
+   model name uses the whole card width instead of a cramped fixed column. */
+.bar-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 13.5px;
   color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
 }
 
 .bar-meta {
   font-size: 11.5px;
   color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ---- Model name (provider / normalized label) ---- */
@@ -475,6 +545,36 @@
   background: rgba(230, 103, 103, 0.14);
 }
 
+/* ---- Load-more (recent logs) ---- */
+
+.logs-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 16px;
+}
+
+.load-more-btn {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 8px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.load-more-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* ---- Responsive ---- */
 
 @media (max-width: 860px) {
@@ -487,18 +587,12 @@
   .usage-page {
     padding: 28px 16px 40px;
   }
-  .kpi-grid {
+  .kpi-grid,
+  .token-grid {
     grid-template-columns: 1fr;
   }
   .usage-filters {
     flex-direction: column;
     align-items: stretch;
-  }
-  .bar-row {
-    grid-template-columns: 1fr;
-    gap: 8px;
-  }
-  .bar-fill {
-    max-width: calc(100% - 90px);
   }
 }

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { verifyAdminKey, UnauthorizedError } from '../../lib/ckeyApi';
+import { isAdminEmail } from '../../lib/adminAuth';
 import './AdminLogin.css';
 
 const AdminLogin: React.FC = () => {
@@ -26,7 +27,13 @@ const AdminLogin: React.FC = () => {
 
     setIsLoading(true);
     try {
-      // The password IS the admin key; verify it against the proxy.
+      // Gate 1: the email must be in the admin allowlist (admin_users).
+      const allowed = await isAdminEmail(email);
+      if (!allowed) {
+        setError('Email này không có quyền truy cập quản trị.');
+        return;
+      }
+      // Gate 2: the password IS the admin key; verify it against the proxy.
       await verifyAdminKey(password);
       navigate('/admin/dashboard', { state: { email } });
     } catch (err) {

@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+graphify-out
+.mcp.json
 
 # Environment / secrets (contains ckey.vn auth cookie)
 .env
@@ -28,3 +30,4 @@ dist-ssr
 *.sln
 *.sw?
 .agents
+.claude
