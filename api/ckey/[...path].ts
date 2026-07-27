@@ -12,6 +12,8 @@
 
 export const config = { runtime: 'edge' };
 
+declare const process: { env: Record<string, string | undefined> };
+
 const CKEY_ORIGIN = 'https://ckey.vn';
 
 export default async function handler(req: Request): Promise<Response> {
