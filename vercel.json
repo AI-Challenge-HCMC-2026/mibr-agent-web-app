@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/ckey/:path*",
-      "destination": "https://ckey.vn/api/:path*"
+      "destination": "/api/ckey/[...path]"
     },
     {
       "source": "/((?!api/).*)",
