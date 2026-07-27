@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   // Load .env (all keys, not just VITE_*) so secrets stay server-side.
   const env = loadEnv(mode, process.cwd(), '')
-  const apiKey = env.CKEY_APIKEY ?? ''
+  const apiKey = env.CKEY_APIKEY || env.VITE_CKEY_APIKEY || ''
   const adminPassword = env.ADMIN_PASSWORD ?? ''
 
   return {
