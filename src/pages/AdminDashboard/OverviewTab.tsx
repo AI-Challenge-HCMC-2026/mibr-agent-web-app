@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   fetchProfile,
   fetchLLMUsageStats,
@@ -16,16 +16,22 @@ interface OverviewTabProps {
   onNavigateToUsage: () => void;
 }
 
+const REFRESH_INTERVAL_SECONDS = 30;
+
 const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigateToDeposit, onNavigateToUsage }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<LLMUsageStats | null>(null);
   const [recentLogs, setRecentLogs] = useState<LLMUsageItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [countdown, setCountdown] = useState(REFRESH_INTERVAL_SECONDS);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
+  // Core data fetching function
+  const loadData = useCallback((isInitial = false) => {
+    if (isInitial) setLoading(true);
+    else setIsRefreshing(true);
+
     setError(null);
 
     Promise.all([
@@ -34,28 +40,50 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigateToDeposit, onNaviga
       fetchLLMUsage(1, 5),
     ])
       .then(([profRes, statsRes, usageRes]) => {
-        if (!alive) return;
         if (profRes.success) setProfile(profRes.data.profile);
         if (statsRes.success) setStats(statsRes.data);
         if (usageRes.success) setRecentLogs(usageRes.data.items);
       })
       .catch((err) => {
-        if (alive) setError(err instanceof Error ? err.message : 'Failed to load overview data.');
+        setError(err instanceof Error ? err.message : 'Failed to load overview data.');
       })
       .finally(() => {
-        if (alive) setLoading(false);
+        setLoading(false);
+        setIsRefreshing(false);
       });
-
-    return () => {
-      alive = false;
-    };
   }, []);
+
+  // Initial load
+  useEffect(() => {
+    loadData(true);
+  }, [loadData]);
+
+  // 30-second countdown timer for auto-refresh
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          loadData(false);
+          return REFRESH_INTERVAL_SECONDS;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [loadData]);
+
+  // Manual refresh handler
+  const handleManualRefresh = () => {
+    loadData(false);
+    setCountdown(REFRESH_INTERVAL_SECONDS);
+  };
 
   if (loading) {
     return <div className="tab-loading">Loading overview data...</div>;
   }
 
-  if (error) {
+  if (error && !profile && !stats) {
     return <div className="tab-error" role="alert">{error}</div>;
   }
 
@@ -181,10 +209,32 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigateToDeposit, onNaviga
         </div>
       )}
 
-      {/* Recent Requests Preview */}
+      {/* Recent Requests Preview with 30s Auto-Refresh Countdown */}
       <div className="card-section">
         <div className="section-header">
-          <h3>Recent API Requests</h3>
+          <div className="section-title-group">
+            <h3>Recent API Requests</h3>
+            <button
+              className="auto-refresh-badge"
+              onClick={handleManualRefresh}
+              title="Click to refresh immediately"
+            >
+              <svg
+                className={`refresh-spinner ${isRefreshing ? 'spinning' : ''}`}
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+              <span>Auto-refreshing in {countdown}s</span>
+            </button>
+          </div>
           <button className="link-btn" onClick={onNavigateToUsage}>
             <span>View all</span>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

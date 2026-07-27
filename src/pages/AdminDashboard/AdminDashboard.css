@@ -589,6 +589,37 @@
   margin-bottom: 16px;
 }
 
+.section-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auto-refresh-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.auto-refresh-badge:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--bg-input);
+}
+
+.refresh-spinner.spinning {
+  animation: spin 1s linear infinite;
+}
+
 .section-header h3 {
   font-size: 16px;
   font-weight: 600;
