@@ -111,7 +111,9 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigateToDeposit, onNaviga
 
           <div className="profile-balance-box">
             <span className="balance-label">Current Balance</span>
-            <div className="balance-amount">{profile.balance}</div>
+            <div className="balance-amount">
+              {profile.balance_raw !== undefined ? formatVND(profile.balance_raw) : profile.balance}
+            </div>
             <button className="btn-deposit-sm" onClick={onNavigateToDeposit}>
               Deposit
             </button>
@@ -170,7 +172,7 @@ const OverviewTab: React.FC<OverviewTabProps> = ({ onNavigateToDeposit, onNaviga
             </div>
             <div className="kpi-content">
               <div className="kpi-label">Total AI Spend</div>
-              <div className="kpi-value">{stats.charged_vnd_text}</div>
+              <div className="kpi-value">{formatVND(stats.charged_vnd ?? 0)}</div>
               <div className="kpi-sub">
                 Cache Read: {formatCompact(stats.cache_read_tokens)} tok
               </div>
