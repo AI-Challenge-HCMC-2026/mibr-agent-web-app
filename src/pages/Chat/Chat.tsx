@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import './Chat.css';
 
 interface Message {
@@ -87,7 +88,9 @@ MCP giúp việc tích hợp các công cụ bên ngoài trở nên cắm-là-ch
 export const Chat: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const userEmail = (location.state as { email?: string } | null)?.email ?? 'user@example.com';
+  const { user, signOut: authSignOut } = useAuth();
+  const userEmail = user?.email ?? (location.state as { email?: string } | null)?.email ?? 'user@example.com';
+  const userName = user?.name ?? userEmail.split('@')[0];
   const [sessions, setSessions] = useState<ChatSession[]>(INITIAL_SESSIONS);
   const [activeSessionId, setActiveSessionId] = useState<string>('session-1');
   const [inputMessage, setInputMessage] = useState('');
@@ -263,20 +266,29 @@ export const Chat: React.FC = () => {
         </div>
 
         <div className="sidebar-footer">
-          <div className="avatar">{getInitials(userEmail)}</div>
+          <div className="avatar">
+            {user?.image ? (
+              <img src={user.image} alt={userName} style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+            ) : (
+              getInitials(userEmail)
+            )}
+          </div>
           <div className="footer-text">
             <div className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px', whiteSpace: 'nowrap' }}>
-              {userEmail.split('@')[0]}
+              {userName}
             </div>
             <div className="plan">Free plan</div>
           </div>
           <div
             className="footer-icon"
             title="Log out"
-            onClick={() => navigate('/')}
+            onClick={async () => {
+              await authSignOut();
+              navigate('/');
+            }}
           >
             {/* Logout icon */}
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
