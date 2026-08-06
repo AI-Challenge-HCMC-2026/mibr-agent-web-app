@@ -188,7 +188,7 @@ export const Chat: React.FC = () => {
       {/* Sidebar */}
       <div className="sidebar">
         <div className="brand">
-          <div className="brand-name">Claude</div>
+          <div className="brand-name">MIBR</div>
           <div className="brand-icons">
             <svg 
               className="icon-btn" 
@@ -381,7 +381,7 @@ export const Chat: React.FC = () => {
               </div>
             </div>
           </div>
-          <div className="footnote">Claude is AI and can make mistakes. Please double-check responses.</div>
+          <div className="footnote">MIBR is AI and can make mistakes. Please double-check responses.</div>
         </div>
       </div>
     </div>

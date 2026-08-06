@@ -1,35 +1,8 @@
-import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handleSubmit = (e: FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (!email) {
-      setError('Email address is required');
-      return;
-    }
-    if (!password) {
-      setError('Password is required');
-      return;
-    }
-
-    setIsLoading(true);
-    // Mock authentication process
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate('/chat', { state: { email } });
-    }, 1000);
-  };
 
   const handleGoogleLogin = () => {
     navigate('/chat', { state: { email: 'google-user@example.com' } });
@@ -38,77 +11,16 @@ const Login: React.FC = () => {
   return (
     <div className="page-login-wrapper">
       <div className="login-wrap">
-        <div className="brand-name">Claude</div>
+        <div className="brand-name">MIBR</div>
 
         <div className="card">
-          <h1>Welcome back</h1>
-          <p className="subtitle">Log in to continue to your account</p>
-
-          <form onSubmit={handleSubmit}>
-            {error && (
-              <div className="error-banner">
-                {error}
-              </div>
-            )}
-
-            <div className="field">
-              <label htmlFor="email">Email address</label>
-              <input
-                type="email"
-                id="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor="password">Password</label>
-              <input
-                type="password"
-                id="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="row-between">
-              <label className="remember">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  disabled={isLoading}
-                />
-                Remember me
-              </label>
-              <a
-                href="#forgot"
-                className="forgot"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert('Password recovery simulated.');
-                }}
-              >
-                Forgot password?
-              </a>
-            </div>
-
-            <button type="submit" className="btn-primary" disabled={isLoading}>
-              {isLoading ? 'Logging in...' : 'Log in'}
-            </button>
-          </form>
-
-          <div className="divider">OR</div>
+          <h1>Internal Workspace</h1>
+          <p className="subtitle">Sign in with your Google account</p>
 
           <button
             className="btn-google"
             type="button"
             onClick={handleGoogleLogin}
-            disabled={isLoading}
           >
             <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -126,3 +38,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+
