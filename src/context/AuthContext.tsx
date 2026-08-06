@@ -27,7 +27,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const fetchSession = async () => {
     try {
       setIsLoading(true);
-      setAuthError(null);
+
+      // Check if URL has error query parameters from Google OAuth redirect failure
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasUrlError = urlParams.has('error') || urlParams.has('error_description');
+
+      if (hasUrlError) {
+        setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
       const res = await authClient.getSession();
 
       if (res?.data?.user) {
@@ -59,17 +68,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!isWhitelisted) {
           await authClient.signOut();
           setUser(null);
-          setAuthError(`Truy cập bị từ chối: Email (${email}) không nằm trong danh sách nội bộ được phép.`);
+          setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
           return;
         }
 
         setUser(currentUser);
       } else {
         setUser(null);
+        if (res?.error) {
+          setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
+        }
       }
     } catch (err) {
       console.error('Failed to retrieve session from Neon Auth:', err);
       setUser(null);
+      setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
     } finally {
       setIsLoading(false);
     }
@@ -82,12 +95,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = async () => {
     try {
       setAuthError(null);
-      await authClient.signIn.social({
+      const res = await authClient.signIn.social({
         provider: 'google',
         callbackURL: `${window.location.origin}/chat`,
       });
+
+      if (res?.error) {
+        setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
+      }
     } catch (err) {
       console.error('Google Sign-in error:', err);
+      setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
     }
   };
 
