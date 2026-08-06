@@ -5,7 +5,7 @@ import './Login.css';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { user, signInWithGoogle, isLoading } = useAuth();
+  const { user, signInWithGoogle, isLoading, authError } = useAuth();
 
   useEffect(() => {
     if (user) {
@@ -14,13 +14,6 @@ const Login: React.FC = () => {
   }, [user, navigate]);
 
   const handleGoogleLogin = async () => {
-    // If VITE_NEON_AUTH_URL is not configured yet (local dev mode), fallback gracefully
-    const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL as string | undefined;
-    if (!neonAuthUrl) {
-      navigate('/chat', { state: { email: 'google-user@example.com' } });
-      return;
-    }
-
     await signInWithGoogle();
   };
 
@@ -32,6 +25,12 @@ const Login: React.FC = () => {
         <div className="card">
           <h1>Internal Workspace</h1>
           <p className="subtitle">Sign in with your Google account</p>
+
+          {authError && (
+            <div className="error-banner">
+              {authError}
+            </div>
+          )}
 
           <button
             className="btn-google"

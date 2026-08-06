@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import './Chat.css';
 
@@ -87,10 +87,9 @@ MCP giúp việc tích hợp các công cụ bên ngoài trở nên cắm-là-ch
 
 export const Chat: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, signOut: authSignOut } = useAuth();
-  const userEmail = user?.email ?? (location.state as { email?: string } | null)?.email ?? 'user@example.com';
-  const userName = user?.name ?? userEmail.split('@')[0];
+  const userEmail = user?.email || '';
+  const userName = user?.name || (userEmail ? userEmail.split('@')[0] : 'User');
   const [sessions, setSessions] = useState<ChatSession[]>(INITIAL_SESSIONS);
   const [activeSessionId, setActiveSessionId] = useState<string>('session-1');
   const [inputMessage, setInputMessage] = useState('');
