@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { sendGeminiChatMessage } from '../../lib/geminiApi';
 import './Chat.css';
 
 interface Message {
@@ -96,6 +97,9 @@ export const Chat: React.FC = () => {
   const [isResponding, setIsResponding] = useState(false);
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const toggleSidebar = () => setIsSidebarCollapsed((prev) => !prev);
+
   const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
   useEffect(() => {
@@ -104,7 +108,7 @@ export const Chat: React.FC = () => {
     }
   }, [activeSession?.messages, isResponding]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputMessage.trim() || isResponding) return;
 
     const userMsgText = inputMessage.trim();
@@ -116,6 +120,8 @@ export const Chat: React.FC = () => {
       sender: 'user',
       content: userMsgText,
     };
+
+    const currentHistory = activeSession ? activeSession.messages : [];
 
     setSessions((prev) =>
       prev.map((session) => {
@@ -131,19 +137,22 @@ export const Chat: React.FC = () => {
 
     setIsResponding(true);
 
-    // Simulate response after a delay
-    setTimeout(() => {
+    try {
+      const responseText = await sendGeminiChatMessage(
+        currentHistory.map((m) => ({ sender: m.sender, content: m.content })),
+        userMsgText
+      );
+
       const botMsg: Message = {
         id: `m-bot-${Date.now()}`,
         sender: 'assistant',
-        eyebrow: 'Generated response using Gemini',
-        content: `I received your message: "${userMsgText}". This is a mock simulation response in React. You can integrate real LLM APIs or backend endpoints here!`,
+        eyebrow: 'Gemini 2.5 Flash',
+        content: responseText,
       };
 
       setSessions((prev) =>
         prev.map((session) => {
           if (session.id === activeSessionId) {
-            // Also update session title if it was a new/default chat
             const updatedTitle =
               session.title === 'New Chat' || session.title.startsWith('New chat')
                 ? userMsgText.slice(0, 30) + (userMsgText.length > 30 ? '...' : '')
@@ -158,8 +167,11 @@ export const Chat: React.FC = () => {
           return session;
         })
       );
+    } catch (err) {
+      console.error('Error generating Gemini response:', err);
+    } finally {
       setIsResponding(false);
-    }, 1500);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -188,9 +200,9 @@ export const Chat: React.FC = () => {
   return (
     <div className="page-chat-wrapper">
       {/* Sidebar */}
-      <div className="sidebar">
+      <div className={`sidebar ${isSidebarCollapsed ? 'collapsed' : ''}`}>
         <div className="brand">
-          <div className="brand-name">MIBR</div>
+          {!isSidebarCollapsed && <div className="brand-name">MIBR</div>}
           <div className="brand-icons">
             <svg 
               className="icon-btn" 
@@ -198,86 +210,90 @@ export const Chat: React.FC = () => {
               fill="none" 
               stroke="currentColor" 
               strokeWidth="2"
-              onClick={handleNewChat}
+              onClick={toggleSidebar}
             >
-              <title>New Chat</title>
-              <circle cx="11" cy="11" r="7"/>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-            </svg>
-            <svg className="icon-btn" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <title>{isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}</title>
               <rect x="3" y="3" width="18" height="18" rx="2"/>
               <line x1="9" y1="3" x2="9" y2="21"/>
             </svg>
           </div>
         </div>
 
-        <div className="nav-item" onClick={handleNewChat}>
+        <div className="nav-item" onClick={handleNewChat} title="New chat">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="12" y1="5" x2="12" y2="19"/>
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
-          New chat
+          {!isSidebarCollapsed && <span>New chat</span>}
         </div>
-        <div className="nav-item">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div className="nav-item" title="Chats">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          Chats
+          {!isSidebarCollapsed && <span>Chats</span>}
         </div>
-        <div className="nav-item" style={{ opacity: 0.5 }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <div className="nav-item" style={{ opacity: 0.5 }} title="Code">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <polyline points="16 18 22 12 16 6"/>
             <polyline points="8 6 2 12 8 18"/>
           </svg>
-          Code
-          <span className="badge">Upgrade</span>
+          {!isSidebarCollapsed && <span>Code</span>}
+          {!isSidebarCollapsed && <span className="badge">Upgrade</span>}
         </div>
 
-        <div className="section-label">Products</div>
-        <div className="nav-item">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        {!isSidebarCollapsed && <div className="section-label">Products</div>}
+        <div className="nav-item" title="Design">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="9"/>
           </svg>
-          Design
+          {!isSidebarCollapsed && <span>Design</span>}
         </div>
 
-        <div className="section-label">
-          Recents
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="21" y1="10" x2="7" y2="10"/>
-            <line x1="21" y1="6" x2="3" y2="6"/>
-            <line x1="21" y1="14" x2="3" y2="14"/>
-            <line x1="21" y1="18" x2="7" y2="18"/>
-          </svg>
-        </div>
+        {!isSidebarCollapsed && (
+          <div className="section-label">
+            Recents
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="21" y1="10" x2="7" y2="10"/>
+              <line x1="21" y1="6" x2="3" y2="6"/>
+              <line x1="21" y1="14" x2="3" y2="14"/>
+              <line x1="21" y1="18" x2="7" y2="18"/>
+            </svg>
+          </div>
+        )}
 
-        <div className="recents">
-          {sessions.map((session) => (
-            <div
-              key={session.id}
-              className={`recent-item ${session.id === activeSessionId ? 'active' : ''}`}
-              onClick={() => setActiveSessionId(session.id)}
-            >
-              {session.title || 'Empty chat'}
-              <span className="dots">⋮</span>
-            </div>
-          ))}
-        </div>
+        {!isSidebarCollapsed && (
+          <div className="recents">
+            {sessions.map((session) => (
+              <div
+                key={session.id}
+                className={`recent-item ${session.id === activeSessionId ? 'active' : ''}`}
+                onClick={() => setActiveSessionId(session.id)}
+              >
+                {session.title || 'Empty chat'}
+                <span className="dots">⋮</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="sidebar-footer">
-          <div className="avatar">
-            {user?.image ? (
-              <img src={user.image} alt={userName} style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
-            ) : (
-              getInitials(userEmail)
-            )}
-          </div>
-          <div className="footer-text">
-            <div className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px', whiteSpace: 'nowrap' }}>
-              {userName}
+          {!isSidebarCollapsed && (
+            <div className="avatar" title={userName}>
+              {user?.image ? (
+                <img src={user.image} alt={userName} style={{ width: '100%', height: '100%', borderRadius: '50%' }} />
+              ) : (
+                getInitials(userEmail)
+              )}
             </div>
-            <div className="plan">Free plan</div>
-          </div>
+          )}
+          {!isSidebarCollapsed && (
+            <div className="footer-text">
+              <div className="name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '140px', whiteSpace: 'nowrap' }}>
+                {userName}
+              </div>
+              <div className="plan">Free plan</div>
+            </div>
+          )}
           <div
             className="footer-icon"
             title="Log out"
@@ -299,11 +315,21 @@ export const Chat: React.FC = () => {
       {/* Main Area */}
       <div className="main">
         <div className="topbar">
-          <div className="topbar-title">
-            {activeSession ? activeSession.title : 'Chat'}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
+          <div className="topbar-left">
+            {isSidebarCollapsed && (
+              <button className="toggle-sidebar-btn" title="Expand sidebar" onClick={toggleSidebar}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/>
+                  <line x1="9" y1="3" x2="9" y2="21"/>
+                </svg>
+              </button>
+            )}
+            <div className="topbar-title">
+              {activeSession ? activeSession.title : 'Chat'}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
           </div>
           <button className="share-btn" onClick={() => alert('Sharing is not supported in this mock interface.')}>Share</button>
         </div>
