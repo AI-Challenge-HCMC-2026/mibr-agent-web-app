@@ -28,11 +28,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setIsLoading(true);
 
-      // Check if URL has error query parameters from Google OAuth redirect failure
       const urlParams = new URLSearchParams(window.location.search);
-      const hasUrlError = urlParams.has('error') || urlParams.has('error_description');
+      const urlError = urlParams.get('error') || urlParams.get('error_description');
 
-      if (hasUrlError) {
+      if (urlError) {
+        console.warn('[AuthContext] OAuth URL Error detected:', urlError);
         setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -44,7 +44,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const email = (currentUser.email || '').toLowerCase().trim();
         const domain = email.split('@')[1] || '';
 
-        // Check Whitelist if environment variables VITE_ALLOWED_DOMAINS or VITE_ALLOWED_EMAILS are defined
         const allowedDomainsRaw = import.meta.env.VITE_ALLOWED_DOMAINS as string | undefined;
         const allowedEmailsRaw = import.meta.env.VITE_ALLOWED_EMAILS as string | undefined;
 
@@ -56,16 +55,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           : [];
 
         let isWhitelisted = true;
+        const hasDomainFilter = allowedDomains.length > 0;
+        const hasEmailFilter = allowedEmails.length > 0;
 
-        if (allowedDomains.length > 0 && !allowedDomains.includes(domain)) {
-          isWhitelisted = false;
-        }
+        if (hasDomainFilter || hasEmailFilter) {
+          const domainMatches = hasDomainFilter && allowedDomains.includes(domain);
+          const emailMatches = hasEmailFilter && allowedEmails.includes(email);
 
-        if (allowedEmails.length > 0 && !allowedEmails.includes(email)) {
-          isWhitelisted = false;
+          if (hasDomainFilter && hasEmailFilter) {
+            isWhitelisted = domainMatches || emailMatches;
+          } else if (hasDomainFilter) {
+            isWhitelisted = domainMatches;
+          } else if (hasEmailFilter) {
+            isWhitelisted = emailMatches;
+          }
         }
 
         if (!isWhitelisted) {
+          console.warn('[AuthContext] User email is not whitelisted in env:', email);
           await authClient.signOut();
           setUser(null);
           setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
@@ -73,16 +80,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         setUser(currentUser);
+        setAuthError(null);
       } else {
         setUser(null);
-        if (res?.error) {
-          setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
-        }
       }
     } catch (err) {
       console.error('Failed to retrieve session from Neon Auth:', err);
       setUser(null);
-      setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
     } finally {
       setIsLoading(false);
     }
