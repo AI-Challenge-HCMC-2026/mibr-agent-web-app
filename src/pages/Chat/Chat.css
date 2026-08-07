@@ -34,7 +34,7 @@
   background: #1e1e1c;
   display: flex;
   flex-direction: column;
-  padding: 16px 12px;
+  padding: 16px 12px 0 12px;
   border-right: 1px solid rgba(255, 255, 255, 0.07);
   height: 100%;
   transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), padding 0.22s ease;
@@ -44,7 +44,7 @@
 
 .page-chat-wrapper .sidebar.collapsed {
   width: 68px;
-  padding: 16px 8px;
+  padding: 16px 8px 0 8px;
 }
 
 /* Brand Header */
@@ -52,7 +52,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 4px 14px 4px;
+  padding: 8px 4px;
+  min-height: 44px;
 }
 
 .page-chat-wrapper .brand-logo-wrap {
@@ -107,6 +108,7 @@
 
 .page-chat-wrapper .sidebar.collapsed .brand {
   justify-content: center;
+  padding: 8px 0;
 }
 
 /* New Chat Button */
@@ -326,7 +328,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 6px 4px 6px;
+  padding: 14px 4px;
+  min-height: 60px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   margin-top: auto;
 }
@@ -360,6 +363,7 @@
 .page-chat-wrapper .footer-text {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   text-align: left;
   overflow: hidden;
 }
@@ -382,6 +386,7 @@
 .page-chat-wrapper .footer-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
 }
 
 .page-chat-wrapper .footer-icon-btn {
@@ -404,7 +409,7 @@
 
 .page-chat-wrapper .sidebar.collapsed .sidebar-footer {
   justify-content: center;
-  padding: 12px 0 4px 0;
+  padding: 14px 0;
 }
 
 /* ---------- Main ---------- */
