@@ -10,17 +10,38 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isLoading: boolean;
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   clearAuthError: () => void;
+  getToken: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getCookieToken = (): string | null => {
+  if (typeof document === 'undefined') return null;
+  const cookies = document.cookie.split(';');
+  for (let c of cookies) {
+    const [name, val] = c.trim().split('=');
+    if (
+      name === 'better-auth.session_token' ||
+      name === 'session_token' ||
+      name === 'auth_token' ||
+      name === 'jwt' ||
+      name === 'token'
+    ) {
+      return decodeURIComponent(val || '');
+    }
+  }
+  return null;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -41,6 +62,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (res?.data?.user) {
         const currentUser = res.data.user as User;
+        const sessionData = res.data.session as any;
+        const currentToken =
+          sessionData?.token ||
+          sessionData?.sessionToken ||
+          sessionData?.id ||
+          (res.data as any)?.token ||
+          getCookieToken();
+
         const email = (currentUser.email || '').toLowerCase().trim();
         const domain = email.split('@')[1] || '';
 
@@ -75,18 +104,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('[AuthContext] User email is not whitelisted in env:', email);
           await authClient.signOut();
           setUser(null);
+          setToken(null);
           setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
           return;
         }
 
         setUser(currentUser);
+        setToken(currentToken);
         setAuthError(null);
       } else {
         setUser(null);
+        setToken(null);
       }
     } catch (err) {
       console.error('Failed to retrieve session from Neon Auth:', err);
       setUser(null);
+      setToken(null);
     } finally {
       setIsLoading(false);
     }
@@ -95,6 +128,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     fetchSession();
   }, []);
+
+  const getToken = async (): Promise<string | null> => {
+    try {
+      const res = await authClient.getSession();
+      const sessionData = res?.data?.session as any;
+      const t =
+        sessionData?.token ||
+        sessionData?.sessionToken ||
+        sessionData?.id ||
+        (res?.data as any)?.token ||
+        getCookieToken() ||
+        token;
+
+      if (t && t !== token) {
+        setToken(t);
+      }
+      return t;
+    } catch (err) {
+      console.error('Failed to get token:', err);
+      return token || getCookieToken();
+    }
+  };
 
   const signInWithGoogle = async () => {
     try {
@@ -120,6 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Sign-out error:', err);
     } finally {
       setUser(null);
+      setToken(null);
       setAuthError(null);
     }
   };
@@ -129,7 +185,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, authError, signInWithGoogle, signOut, clearAuthError }}>
+    <AuthContext.Provider value={{ user, token, isLoading, authError, signInWithGoogle, signOut, clearAuthError, getToken }}>
       {children}
     </AuthContext.Provider>
   );
