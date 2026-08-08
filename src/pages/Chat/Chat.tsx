@@ -6,6 +6,7 @@ import FormattedMessage from '../../components/FormattedMessage/FormattedMessage
 import { ThoughtProcess, ReasoningProcess } from '../../components/FormattedMessage/ThoughtProcess';
 import ChatLayout, { type ChatSession } from '../../components/ChatLayout/ChatLayout';
 import { getStoredUserSettings } from '../Settings/Settings';
+import { filterCommands, type SlashCommand } from './slashCommands';
 import '../Settings/Settings.css';
 import './Chat.css';
 
@@ -89,9 +90,14 @@ MCP giúp việc tích hợp các công cụ bên ngoài trở nên cắm-là-ch
 
 const formatModelLabel = (modelKey?: string) => {
   if (!modelKey) return 'Gemini 3.5 Flash Lite';
-  if (modelKey === 'gemini-3.5-flash-lite') return 'Gemini 3.5 Flash Lite';
-  if (modelKey === 'gemini-3.1-flash-lite') return 'Gemini 3.1 Flash Lite';
-  return modelKey;
+  const labels: Record<string, string> = {
+    'gemini-3.5-flash-lite': 'Gemini 3.5 Flash Lite',
+    'gemini-3.1-flash-lite': 'Gemini 3.1 Flash Lite',
+    'gemini-3.6-flash': 'Gemini 3.6 Flash',
+    'gemini-3.5-flash': 'Gemini 3.5 Flash',
+    'gemini-2.5-flash': 'Gemini 2.5 Flash',
+  };
+  return labels[modelKey] || modelKey;
 };
 
 export const Chat: React.FC = () => {
@@ -101,10 +107,17 @@ export const Chat: React.FC = () => {
   const [sessions, setSessions] = useState<ChatSession[]>(INITIAL_SESSIONS);
   const [activeSessionId, setActiveSessionId] = useState<string>('session-1');
   const [inputMessage, setInputMessage] = useState('');
+  const [activeCommand, setActiveCommand] = useState<SlashCommand | null>(null);
+  const [showCommandMenu, setShowCommandMenu] = useState(false);
+  const [commandFilter, setCommandFilter] = useState('');
+  const [menuHighlight, setMenuHighlight] = useState(0);
   const [isResponding, setIsResponding] = useState(false);
   const [activeToolStatus, setActiveToolStatus] = useState<string | null>(null);
   const [streamingBotMsgId, setStreamingBotMsgId] = useState<string | null>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const filteredCommands = filterCommands(commandFilter);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
@@ -160,7 +173,12 @@ export const Chat: React.FC = () => {
     if (!inputMessage.trim() || isResponding) return;
 
     const userMsgText = inputMessage.trim();
+    const messageToSend = activeCommand
+      ? activeCommand.buildMessage(userMsgText)
+      : userMsgText;
     setInputMessage('');
+    setActiveCommand(null);
+    setShowCommandMenu(false);
 
     const savedSettings = getStoredUserSettings();
     const modelDisplayName = formatModelLabel(savedSettings?.model);
@@ -207,7 +225,7 @@ export const Chat: React.FC = () => {
 
       const result = await sendGeminiChatMessage({
         historyMessages: currentHistory.map((m) => ({ sender: m.sender, content: m.content })),
-        newMessageText: userMsgText,
+        newMessageText: messageToSend,
         userToken,
         onChunk: (accumulatedText) => {
           setSessions((prev) =>
@@ -286,7 +304,60 @@ export const Chat: React.FC = () => {
     }
   };
 
+  const selectCommand = (cmd: SlashCommand) => {
+    setActiveCommand(cmd);
+    setShowCommandMenu(false);
+    setCommandFilter('');
+    setInputMessage('');
+    inputRef.current?.focus();
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value;
+    setInputMessage(value);
+
+    // Only trigger the command menu when no command is active yet and the
+    // input starts with '/'. Once a command is picked, '/' is just text.
+    if (!activeCommand && value.startsWith('/')) {
+      setShowCommandMenu(true);
+      setCommandFilter(value.slice(1));
+      setMenuHighlight(0);
+    } else {
+      setShowCommandMenu(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (showCommandMenu && filteredCommands.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMenuHighlight((h) => (h + 1) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMenuHighlight((h) => (h - 1 + filteredCommands.length) % filteredCommands.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        selectCommand(filteredCommands[menuHighlight]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowCommandMenu(false);
+        return;
+      }
+    }
+
+    // Backspace at the very start of an empty query clears the active command pill.
+    if (activeCommand && e.key === 'Backspace' && inputMessage === '') {
+      e.preventDefault();
+      setActiveCommand(null);
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
@@ -381,21 +452,63 @@ export const Chat: React.FC = () => {
 
       <div className="composer-wrap">
         <div className="composer">
-          <textarea
-            className="composer-input"
-            rows={1}
-            placeholder="Write a message..."
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isResponding}
-          />
+          {showCommandMenu && filteredCommands.length > 0 && (
+            <div className="slash-menu">
+              {filteredCommands.map((cmd, idx) => (
+                <div
+                  key={cmd.id}
+                  className={`slash-menu-item${idx === menuHighlight ? ' active' : ''}`}
+                  onMouseEnter={() => setMenuHighlight(idx)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    selectCommand(cmd);
+                  }}
+                >
+                  <span className="slash-menu-name">{cmd.name}</span>
+                  <span className="slash-menu-desc">{cmd.description}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="composer-input-row">
+            {activeCommand && (
+              <span className="command-pill">
+                {activeCommand.name}
+                <button
+                  type="button"
+                  className="command-pill-x"
+                  onClick={() => {
+                    setActiveCommand(null);
+                    inputRef.current?.focus();
+                  }}
+                  aria-label="Remove command"
+                >
+                  ×
+                </button>
+              </span>
+            )}
+            <textarea
+              ref={inputRef}
+              className="composer-input"
+              rows={1}
+              placeholder={
+                activeCommand ? activeCommand.queryPlaceholder : 'Write a message... (type / for commands)'
+              }
+              value={inputMessage}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              disabled={isResponding}
+            />
+          </div>
           <div className="composer-controls">
             <button
-              className="plus-btn"
+              className="attach-btn"
               onClick={() => alert('Attachments are not supported in this mock interface.')}
+              aria-label="Attach file"
             >
-              +
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
             </button>
             <div className="right-controls">
               <div className="model-pill">
