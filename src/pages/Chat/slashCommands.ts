@@ -10,12 +10,12 @@ export interface SlashCommand {
 export const SLASH_COMMANDS: SlashCommand[] = [
   {
     id: 'fts-search',
-    name: 'FTS-Search',
+    name: 'FTS Search',
     description: 'Tìm kiếm toàn văn (Full-Text Search) trên dữ liệu',
     queryLabel: 'Query',
     queryPlaceholder: 'Nhập từ khoá tìm kiếm...',
     buildMessage: (query) =>
-      `Hãy sử dụng công cụ MCP Full-Text Search để tìm kiếm và tổng hợp kết quả liên quan nhất cho truy vấn sau. Trình bày kết quả rõ ràng, trích dẫn nguồn nếu có.\n\nTruy vấn: ${query}`,
+      `Hãy sử dụng công cụ fts_search để tìm kiếm danh sách video liên quan nhất cho truy vấn được đính kèm sau đây. Trình bày kết quả dạng bảng với đầy đủ thông tin của video kèm fts score.\n\nTruy vấn: ${query}`,
   },
   {
     id: 'vector-search',
