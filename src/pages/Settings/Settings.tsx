@@ -28,6 +28,25 @@ export const getStoredUserSettings = (): UserSettingsData | null => {
   }
 };
 
+export const AVAILABLE_MODELS: { value: string; label: string }[] = [
+  { value: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash Lite' },
+  { value: 'gemini-3.1-flash-lite', label: 'Gemini 3.1 Flash Lite' },
+  { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
+  { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+];
+
+export const saveUserModel = (model: string): void => {
+  const existing = getStoredUserSettings();
+  const updated: UserSettingsData = {
+    provider: existing?.provider || 'gemini',
+    apikey: existing?.apikey || '',
+    ...existing,
+    model,
+  };
+  localStorage.setItem(SETTINGS_FULL_LOCAL_STORAGE_KEY, JSON.stringify(updated));
+};
+
 export const SettingsContent: React.FC = () => {
   const { user, getToken } = useAuth();
   const [apikey, setApikey] = useState<string>('');

@@ -664,11 +664,62 @@
   font-size: 13.5px;
 }
 
+.page-chat-wrapper .model-selector {
+  position: relative;
+}
+
 .page-chat-wrapper .model-pill {
   display: flex;
   align-items: center;
   gap: 4px;
   cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+
+.page-chat-wrapper .model-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.page-chat-wrapper .model-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--bg-panel);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+  z-index: 20;
+}
+
+.page-chat-wrapper .model-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.page-chat-wrapper .model-menu-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.page-chat-wrapper .model-menu-item.active {
+  color: var(--text-primary);
 }
 
 .page-chat-wrapper .footnote {

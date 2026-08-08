@@ -5,7 +5,7 @@ import { sendGeminiChatMessage, type ToolCallInfo } from '../../lib/geminiApi';
 import FormattedMessage from '../../components/FormattedMessage/FormattedMessage';
 import { ThoughtProcess, ReasoningProcess } from '../../components/FormattedMessage/ThoughtProcess';
 import ChatLayout, { type ChatSession } from '../../components/ChatLayout/ChatLayout';
-import { getStoredUserSettings } from '../Settings/Settings';
+import { getStoredUserSettings, saveUserModel, AVAILABLE_MODELS } from '../Settings/Settings';
 import { filterCommands, type SlashCommand } from './slashCommands';
 import '../Settings/Settings.css';
 import './Chat.css';
@@ -114,8 +114,13 @@ export const Chat: React.FC = () => {
   const [isResponding, setIsResponding] = useState(false);
   const [activeToolStatus, setActiveToolStatus] = useState<string | null>(null);
   const [streamingBotMsgId, setStreamingBotMsgId] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>(
+    () => getStoredUserSettings()?.model || 'gemini-3.5-flash-lite'
+  );
+  const [showModelMenu, setShowModelMenu] = useState(false);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
 
   const filteredCommands = filterCommands(commandFilter);
 
@@ -168,6 +173,23 @@ export const Chat: React.FC = () => {
       chatAreaRef.current.scrollTop = chatAreaRef.current.scrollHeight;
     }
   }, [activeSession?.messages, isResponding, activeToolStatus]);
+
+  useEffect(() => {
+    if (!showModelMenu) return;
+    const onClickOutside = (e: MouseEvent) => {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setShowModelMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [showModelMenu]);
+
+  const handleSelectModel = (modelValue: string) => {
+    setSelectedModel(modelValue);
+    saveUserModel(modelValue);
+    setShowModelMenu(false);
+  };
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isResponding) return;
@@ -364,8 +386,7 @@ export const Chat: React.FC = () => {
     }
   };
 
-  const savedSettings = getStoredUserSettings();
-  const currentModelLabel = formatModelLabel(savedSettings?.model);
+  const currentModelLabel = formatModelLabel(selectedModel);
 
   return (
     <ChatLayout
@@ -511,11 +532,35 @@ export const Chat: React.FC = () => {
               </svg>
             </button>
             <div className="right-controls">
-              <div className="model-pill">
-                {currentModelLabel} &nbsp;
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
+              <div className="model-selector" ref={modelMenuRef}>
+                {showModelMenu && (
+                  <div className="model-menu">
+                    {AVAILABLE_MODELS.map((m) => (
+                      <div
+                        key={m.value}
+                        className={`model-menu-item${m.value === selectedModel ? ' active' : ''}`}
+                        onClick={() => handleSelectModel(m.value)}
+                      >
+                        {m.label}
+                        {m.value === selectedModel && (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="model-pill"
+                  onClick={() => setShowModelMenu((v) => !v)}
+                >
+                  {currentModelLabel} &nbsp;
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
               </div>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ cursor: 'pointer' }}>
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
