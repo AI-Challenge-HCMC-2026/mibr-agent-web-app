@@ -34,6 +34,8 @@ export const AVAILABLE_MODELS: { value: string; label: string }[] = [
   { value: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
   { value: 'gemini-3.5-flash', label: 'Gemini 3.5 Flash' },
   { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gemma-4-31b-it', label: 'Gemma 4 31B' },
+  { value: 'gemma-4-26b-a4b-it', label: 'Gemma 4 26B' },
 ];
 
 export const saveUserModel = (model: string): void => {
@@ -287,11 +289,11 @@ export const SettingsContent: React.FC = () => {
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                   >
-                    <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite — khuyên dùng</option>
-                    <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-                    <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
-                    <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
-                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    {AVAILABLE_MODELS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.value === 'gemini-3.5-flash-lite' ? `${m.label} — khuyên dùng` : m.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

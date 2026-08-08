@@ -96,6 +96,8 @@ const formatModelLabel = (modelKey?: string) => {
     'gemini-3.6-flash': 'Gemini 3.6 Flash',
     'gemini-3.5-flash': 'Gemini 3.5 Flash',
     'gemini-2.5-flash': 'Gemini 2.5 Flash',
+    'gemma-4-31b-it': 'Gemma 4 31B',
+    'gemma-4-26b-a4b-it': 'Gemma 4 26B',
   };
   return labels[modelKey] || modelKey;
 };
