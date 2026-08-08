@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { sendGeminiChatMessage, type ToolCallInfo } from '../../lib/geminiApi';
 import ApiDocuments from '../../components/ApiDocuments/ApiDocuments';
 import McpTools from '../../components/McpTools/McpTools';
+import FormattedMessage from '../../components/FormattedMessage/FormattedMessage';
 import { getStoredUserSettings, SettingsContent } from '../Settings/Settings';
 import '../Settings/Settings.css';
 import './Chat.css';
@@ -14,6 +15,7 @@ interface Message {
   content: string;
   eyebrow?: string;
   toolCalls?: ToolCallInfo[];
+  reasoning?: string;
 }
 
 interface ChatSession {
@@ -110,6 +112,7 @@ export const Chat: React.FC<ChatProps> = ({ initialTab }) => {
   const [isResponding, setIsResponding] = useState(false);
   const [activeToolStatus, setActiveToolStatus] = useState<string | null>(null);
   const [openToolTraces, setOpenToolTraces] = useState<Record<string, boolean>>({});
+  const [openReasoningTraces, setOpenReasoningTraces] = useState<Record<string, boolean>>({});
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -215,17 +218,32 @@ export const Chat: React.FC<ChatProps> = ({ initialTab }) => {
     }));
   };
 
+  const toggleReasoningTrace = (msgId: string) => {
+    setOpenReasoningTraces((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isResponding) return;
 
     const userMsgText = inputMessage.trim();
     setInputMessage('');
 
-    // Add user message to active session
+    const savedSettings = getStoredUserSettings();
+    const modelDisplayName = formatModelLabel(savedSettings?.model);
+
+    // Add user message & initial empty bot message placeholder to active session
     const userMsg: Message = {
       id: `m-user-${Date.now()}`,
       sender: 'user',
       content: userMsgText,
+    };
+
+    const botMsgId = `m-bot-${Date.now()}`;
+    const initialBotMsg: Message = {
+      id: botMsgId,
+      sender: 'assistant',
+      eyebrow: modelDisplayName,
+      content: '',
     };
 
     const currentHistory = activeSession ? activeSession.messages : [];
@@ -233,9 +251,15 @@ export const Chat: React.FC<ChatProps> = ({ initialTab }) => {
     setSessions((prev) =>
       prev.map((session) => {
         if (session.id === activeSessionId) {
+          const updatedTitle =
+            session.title === 'New Chat' || session.title.startsWith('New chat')
+              ? userMsgText.slice(0, 30) + (userMsgText.length > 30 ? '...' : '')
+              : session.title;
+
           return {
             ...session,
-            messages: [...session.messages, userMsg],
+            title: updatedTitle,
+            messages: [...session.messages, userMsg, initialBotMsg],
           };
         }
         return session;
@@ -253,6 +277,36 @@ export const Chat: React.FC<ChatProps> = ({ initialTab }) => {
         historyMessages: currentHistory.map((m) => ({ sender: m.sender, content: m.content })),
         newMessageText: userMsgText,
         userToken,
+        onChunk: (accumulatedText) => {
+          setSessions((prev) =>
+            prev.map((session) => {
+              if (session.id === activeSessionId) {
+                return {
+                  ...session,
+                  messages: session.messages.map((m) =>
+                    m.id === botMsgId ? { ...m, content: accumulatedText } : m
+                  ),
+                };
+              }
+              return session;
+            })
+          );
+        },
+        onReasoningChunk: (accumulatedReasoning) => {
+          setSessions((prev) =>
+            prev.map((session) => {
+              if (session.id === activeSessionId) {
+                return {
+                  ...session,
+                  messages: session.messages.map((m) =>
+                    m.id === botMsgId ? { ...m, reasoning: accumulatedReasoning } : m
+                  ),
+                };
+              }
+              return session;
+            })
+          );
+        },
         onToolCallStart: (toolName) => {
           setActiveToolStatus(`Đang thực thi công cụ MCP: ${toolName}...`);
         },
@@ -263,30 +317,27 @@ export const Chat: React.FC<ChatProps> = ({ initialTab }) => {
 
       const responseText = typeof result === 'string' ? result : result.text;
       const toolCalls = typeof result === 'string' ? [] : result.toolCalls;
-
-      const savedSettings = getStoredUserSettings();
-      const modelDisplayName = formatModelLabel(savedSettings?.model);
-
-      const botMsg: Message = {
-        id: `m-bot-${Date.now()}`,
-        sender: 'assistant',
-        eyebrow: modelDisplayName,
-        content: responseText,
-        toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
-      };
-
+      const reasoningText = typeof result === 'string' ? undefined : result.reasoningText;
       setSessions((prev) =>
         prev.map((session) => {
           if (session.id === activeSessionId) {
-            const updatedTitle =
-              session.title === 'New Chat' || session.title.startsWith('New chat')
-                ? userMsgText.slice(0, 30) + (userMsgText.length > 30 ? '...' : '')
-                : session.title;
-
             return {
               ...session,
-              title: updatedTitle,
-              messages: [...session.messages, botMsg],
+              messages: session.messages.map((m) => {
+                if (m.id === botMsgId) {
+                  const validText =
+                    responseText && responseText !== 'Không có phản hồi từ Gemini AI.'
+                      ? responseText
+                      : (m.content || responseText);
+                  return {
+                    ...m,
+                    content: validText,
+                    toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
+                    reasoning: reasoningText || m.reasoning,
+                  };
+                }
+                return m;
+              }),
             };
           }
           return session;
@@ -604,10 +655,46 @@ export const Chat: React.FC<ChatProps> = ({ initialTab }) => {
                     } else {
                       const hasToolCalls = msg.toolCalls && msg.toolCalls.length > 0;
                       const isOpenTrace = Boolean(openToolTraces[msg.id]);
+                      const hasReasoning = Boolean(msg.reasoning);
+                      const isOpenReasoning = openReasoningTraces[msg.id] !== undefined ? Boolean(openReasoningTraces[msg.id]) : true;
 
                       return (
                         <div key={msg.id} className="assistant-block">
                           {msg.eyebrow && <div className="eyebrow">{msg.eyebrow}</div>}
+
+                          {/* Claude-Style Reasoning Thought Process UI */}
+                          {hasReasoning && (
+                            <div className="claude-reasoning-container">
+                              <div
+                                className="claude-reasoning-header"
+                                onClick={() => toggleReasoningTrace(msg.id)}
+                                title={isOpenReasoning ? 'Thu gọn quá trình suy luận' : 'Xem chi tiết quá trình suy luận'}
+                              >
+                                <div className="claude-reasoning-title">
+                                  <svg
+                                    width="14"
+                                    height="14"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    className={`claude-chevron ${isOpenReasoning ? 'open' : ''}`}
+                                  >
+                                    <polyline points="9 18 15 12 9 6" />
+                                  </svg>
+                                  <span>Quá trình suy luận</span>
+                                </div>
+                              </div>
+
+                              {isOpenReasoning && (
+                                <div className="claude-reasoning-body">
+                                  <div className="claude-reasoning-text">
+                                    {msg.reasoning}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           {/* MCP Tool Calls Trace Card */}
                           {hasToolCalls && (
@@ -669,9 +756,7 @@ export const Chat: React.FC<ChatProps> = ({ initialTab }) => {
                             </div>
                           )}
 
-                          <div style={{ whiteSpace: 'pre-wrap' }}>
-                            {msg.content}
-                          </div>
+                          <FormattedMessage content={msg.content} />
                         </div>
                       );
                     }

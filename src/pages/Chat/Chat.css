@@ -597,3 +597,64 @@
 .page-chat-wrapper ::-webkit-scrollbar { width: 8px; }
 .page-chat-wrapper ::-webkit-scrollbar-thumb { background: #45443f; border-radius: 4px; }
 .page-chat-wrapper ::-webkit-scrollbar-track { background: transparent; }
+
+/* Claude-Style Vertical Line Reasoning UI */
+.claude-reasoning-container {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.claude-reasoning-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 0;
+  width: fit-content;
+}
+
+.claude-reasoning-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted, #8c8a83);
+  transition: color 0.15s ease;
+}
+
+.claude-reasoning-header:hover .claude-reasoning-title {
+  color: var(--text-primary, #f2f0ec);
+}
+
+.claude-chevron {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-muted, #8c8a83);
+}
+
+.claude-chevron.open {
+  transform: rotate(90deg);
+}
+
+.claude-reasoning-body {
+  position: relative;
+  margin-top: 6px;
+  margin-left: 6px;
+  padding-left: 16px;
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  transition: border-color 0.15s ease;
+}
+
+.claude-reasoning-body:hover {
+  border-left-color: rgba(255, 255, 255, 0.35);
+}
+
+.claude-reasoning-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary, #b7b4ac);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

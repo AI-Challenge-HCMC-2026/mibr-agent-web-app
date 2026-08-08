@@ -26,6 +26,8 @@ export interface SendGeminiChatOptions {
   userToken?: string | null;
   mcpServerUrl?: string;
   enableMcp?: boolean;
+  onChunk?: (accumulatedText: string, chunkText: string) => void;
+  onReasoningChunk?: (accumulatedReasoning: string) => void;
   onToolCallStart?: (toolName: string, args: Record<string, any>) => void;
   onToolCallEnd?: (toolName: string, result: any, isError?: boolean) => void;
 }
@@ -33,6 +35,7 @@ export interface SendGeminiChatOptions {
 export interface GeminiChatResponse {
   text: string;
   toolCalls: ToolCallInfo[];
+  reasoningText?: string;
 }
 
 export async function sendGeminiChatMessage(
@@ -46,6 +49,8 @@ export async function sendGeminiChatMessage(
   let userToken: string | null | undefined;
   let mcpServerUrl = DEFAULT_MCP_SERVER_URL;
   let enableMcp = true;
+  let onChunk: ((accumulatedText: string, chunkText: string) => void) | undefined;
+  let onReasoningChunk: ((accumulatedReasoning: string) => void) | undefined;
   let onToolCallStart: ((toolName: string, args: Record<string, any>) => void) | undefined;
   let onToolCallEnd: ((toolName: string, result: any, isError?: boolean) => void) | undefined;
   let isOptionsObject = false;
@@ -62,6 +67,8 @@ export async function sendGeminiChatMessage(
     userToken = optionsOrHistory.userToken;
     mcpServerUrl = optionsOrHistory.mcpServerUrl || DEFAULT_MCP_SERVER_URL;
     enableMcp = optionsOrHistory.enableMcp ?? true;
+    onChunk = optionsOrHistory.onChunk;
+    onReasoningChunk = optionsOrHistory.onReasoningChunk;
     onToolCallStart = optionsOrHistory.onToolCallStart;
     onToolCallEnd = optionsOrHistory.onToolCallEnd;
   }
@@ -120,32 +127,122 @@ Bạn ĐÃ ĐƯỢC KẾT NỐI VÀ TRANG BỊ các công cụ MCP trực tiếp
 Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặc yêu cầu thực hiện truy vấn/tác vụ, hãy tự tin khẳng định bạn đã kết nối với MCP Server nội bộ và chủ động thực thi công cụ MCP phù hợp.`
       : undefined;
 
+    const enableReasoning = userSettings?.enableReasoning ?? true;
+
     const chatOptions: any = {
       model: selectedModel,
       history,
       config: {
         ...(systemInstruction ? { systemInstruction } : {}),
         ...(toolsConfig.length > 0 ? { tools: toolsConfig } : {}),
+        ...(enableReasoning ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
       },
     };
 
     const chat = ai.chats.create(chatOptions);
+    const allReasoningSteps: string[] = [];
 
-    let response = await chat.sendMessage({
-      message: newMessageText,
-    });
+    const collectReasoning = (resObj: any) => {
+      const candidate = resObj?.candidates?.[0];
+      if (candidate?.content?.parts) {
+        let updated = false;
+        for (const part of candidate.content.parts) {
+          const pAny = part as any;
+          if (pAny.thought === true || pAny.thought) {
+            const tStr = pAny.text || (typeof pAny.thought === 'string' ? pAny.thought : '');
+            if (tStr.trim() && !allReasoningSteps.includes(tStr.trim())) {
+              allReasoningSteps.push(tStr.trim());
+              updated = true;
+            }
+          } else if (pAny.executableCode) {
+            const codeStr = `\`\`\`python\n${pAny.executableCode.code || ''}\n\`\`\``;
+            if (!allReasoningSteps.includes(codeStr)) {
+              allReasoningSteps.push(codeStr);
+              updated = true;
+            }
+          }
+        }
+        if (updated) {
+          onReasoningChunk?.(allReasoningSteps.join('\n\n').trim());
+        }
+      }
+    };
+
+    const getChunkText = (chunkObj: any): string => {
+      if (!chunkObj) return '';
+
+      // 1. Try direct text property
+      try {
+        if (typeof chunkObj.text === 'string' && chunkObj.text.trim()) {
+          return chunkObj.text;
+        }
+      } catch {
+        // Ignore getter warning if non-text parts exist
+      }
+
+      // 2. Inspect candidate parts
+      const candidate = chunkObj.candidates?.[0];
+      const parts = candidate?.content?.parts || chunkObj.parts;
+      if (Array.isArray(parts)) {
+        let regularText = '';
+        let fallbackText = '';
+        for (const part of parts) {
+          if (typeof part?.text === 'string' && !part.functionCall) {
+            fallbackText += part.text;
+            if (!part.thought) {
+              regularText += part.text;
+            }
+          }
+        }
+        if (regularText.trim()) return regularText;
+        if (fallbackText.trim()) return fallbackText;
+      }
+
+      return '';
+    };
+
+    let accumulatedText = '';
+    const processStream = async (msgPayload: any) => {
+      let lastChunk: any = null;
+      try {
+        const stream = await chat.sendMessageStream({ message: msgPayload });
+        for await (const chunk of stream) {
+          lastChunk = chunk;
+          collectReasoning(chunk);
+          const cText = getChunkText(chunk);
+          if (cText) {
+            accumulatedText += cText;
+            onChunk?.(accumulatedText, cText);
+          }
+        }
+      } catch (streamErr) {
+        // Fallback to sendMessage if sendMessageStream fails or is unsupported
+        console.warn('[Gemini Stream] Stream failed, falling back to standard response:', streamErr);
+        const singleRes = await chat.sendMessage({ message: msgPayload });
+        lastChunk = singleRes;
+        collectReasoning(singleRes);
+        const sText = getChunkText(singleRes);
+        if (sText) {
+          accumulatedText = sText;
+          onChunk?.(accumulatedText, sText);
+        }
+      }
+      return lastChunk;
+    };
+
+    let response = await processStream(newMessageText);
 
     // Multi-turn Tool Calling Loop
     const MAX_TURNS = 10;
     let turnCount = 0;
 
     while (turnCount < MAX_TURNS) {
-      const candidate = response.candidates?.[0];
+      const candidate = response?.candidates?.[0];
       const parts = candidate?.content?.parts || [];
 
       // Extract function calls from response
       const functionCalls: Array<{ name: string; args: any }> = [];
-      if (response.functionCalls && response.functionCalls.length > 0) {
+      if (response?.functionCalls && response.functionCalls.length > 0) {
         for (const fc of response.functionCalls) {
           if (fc.name) {
             functionCalls.push({ name: fc.name, args: fc.args || {} });
@@ -193,18 +290,22 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
         });
       }
 
-      // Send tool outputs back to Gemini model
-      response = await chat.sendMessage({
-        message: functionResponses as any,
-      });
+      // Reset accumulated text for final answer after tool call turn
+      accumulatedText = '';
+      response = await processStream(functionResponses as any);
     }
 
-    const finalText = response.text || 'Không có phản hồi từ Gemini AI.';
+    const finalText =
+      accumulatedText.trim() ||
+      getChunkText(response) ||
+      'Không có phản hồi từ Gemini AI.';
+    const extractedReasoning = allReasoningSteps.join('\n\n').trim();
 
     if (isOptionsObject) {
       return {
         text: finalText,
         toolCalls: executedToolCalls,
+        reasoningText: extractedReasoning || undefined,
       };
     }
 

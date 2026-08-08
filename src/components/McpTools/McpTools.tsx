@@ -64,7 +64,7 @@ export const McpTools: React.FC<McpToolsProps> = ({ onSelectTool, onNavigateToSe
           <div>
             <h1 className="mcp-tools-title">MCP Tools</h1>
             <p className="mcp-tools-subtitle">
-              Danh sách các công cụ Model Context Protocol (MCP) có sẵn từ máy chủ MCP Server nội bộ
+              Danh sách các công cụ Model Context Protocol (MCP) từ <code>{serverUrl}</code>
             </p>
           </div>
         </div>
@@ -112,9 +112,16 @@ export const McpTools: React.FC<McpToolsProps> = ({ onSelectTool, onNavigateToSe
           </svg>
           <p style={{ color: '#f87171', fontWeight: 600, marginBottom: 8 }}>{error}</p>
           <p style={{ fontSize: 13, color: '#8c8a83' }}>Vui lòng kiểm tra lại kết nối mạng hoặc URL MCP Server trong phần Cài đặt.</p>
-          <button className="mcp-btn mcp-btn-primary" onClick={loadTools} style={{ marginTop: 16 }}>
-            Thử lại
-          </button>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button className="mcp-btn mcp-btn-primary" onClick={loadTools}>
+              Thử lại
+            </button>
+            {onNavigateToSettings && (
+              <button className="mcp-btn mcp-btn-secondary" onClick={onNavigateToSettings}>
+                Cài đặt MCP
+              </button>
+            )}
+          </div>
         </div>
       ) : filteredTools.length === 0 ? (
         <div className="mcp-empty-state">
