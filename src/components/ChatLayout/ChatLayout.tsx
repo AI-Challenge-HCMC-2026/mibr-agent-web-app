@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import '../../pages/Chat/Chat.css';
 
@@ -35,7 +35,6 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
   children,
 }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, signOut: authSignOut, getToken } = useAuth();
   const userEmail = user?.email || '';
   const userName = user?.name || (userEmail ? userEmail.split('@')[0] : 'User');
