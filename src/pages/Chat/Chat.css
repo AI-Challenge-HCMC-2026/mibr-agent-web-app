@@ -420,6 +420,7 @@
   min-width: 0;
   height: 100%;
   background: var(--bg);
+  position: relative;
 }
 
 .page-chat-wrapper .topbar {
@@ -657,4 +658,20 @@
   color: var(--text-secondary, #b7b4ac);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Live (streaming) reasoning shown while the assistant is still thinking */
+.claude-live-reasoning {
+  margin-top: 8px;
+  margin-left: 6px;
+  padding-left: 16px;
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.claude-live-reasoning .formatted-message-body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-secondary, #b7b4ac);
 }

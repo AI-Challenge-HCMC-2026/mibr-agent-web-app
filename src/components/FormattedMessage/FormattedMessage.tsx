@@ -1,23 +1,42 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import './FormattedMessage.css';
 
 interface FormattedMessageProps {
   content: string;
 }
 
-const YouTubeIcon: React.FC = () => (
-  <svg className="yt-svg-icon" viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
-    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+// ─── Inline SVG Icons ────────────────────────────────────────────────────────
+
+const CopyIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+  </svg>
+);
+
+const CheckIcon: React.FC = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56d364" strokeWidth="2">
+    <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 
 const ExternalLinkIcon: React.FC = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
     <polyline points="15 3 21 3 21 9" />
     <line x1="10" y1="14" x2="21" y2="3" />
   </svg>
 );
+
+const YouTubeIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" width="12" height="12">
+    <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+  </svg>
+);
+
+// ─── Code Block with Copy Button ─────────────────────────────────────────────
 
 const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, code }) => {
   const [copied, setCopied] = useState(false);
@@ -35,18 +54,13 @@ const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, cod
         <button type="button" className="md-copy-btn" onClick={handleCopy}>
           {copied ? (
             <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#56d364" strokeWidth="2">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span>Đã chép</span>
+              <CheckIcon />
+              <span>Copied!</span>
             </>
           ) : (
             <>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-              </svg>
-              <span>Sao chép</span>
+              <CopyIcon />
+              <span>Copy</span>
             </>
           )}
         </button>
@@ -58,219 +72,125 @@ const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, cod
   );
 };
 
-// Function to parse inline elements: bold, italic, inline code, and links (including YouTube)
-function parseInline(text: string): React.ReactNode[] {
-  // Regex matches markdown links [title](url), bold **text**, italic *text*, inline `code`
-  const regex = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`)/g;
-
-  const result: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = regex.exec(text)) !== null) {
-    // Push preceding plain text
-    if (match.index > lastIndex) {
-      result.push(text.substring(lastIndex, match.index));
-    }
-
-    const [fullMatch, , linkTitle, linkUrl, boldText, italicText, inlineCode] = match;
-
-    if (linkTitle && linkUrl) {
-      const isYouTube = linkUrl.includes('youtube.com') || linkUrl.includes('youtu.be');
-      if (isYouTube) {
-        result.push(
-          <a
-            key={match.index}
-            href={linkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="md-yt-link-chip"
-            title={`Xem video YouTube: ${linkTitle}`}
-          >
-            <span className="yt-badge-icon">
-              <YouTubeIcon />
-            </span>
-            <span className="yt-link-title">{linkTitle}</span>
-            <span className="yt-action-label">Xem Video <ExternalLinkIcon /></span>
-          </a>
-        );
-      } else {
-        result.push(
-          <a
-            key={match.index}
-            href={linkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="md-link"
-          >
-            {linkTitle} <ExternalLinkIcon />
-          </a>
-        );
-      }
-    } else if (boldText) {
-      result.push(<strong key={match.index} className="md-bold">{boldText}</strong>);
-    } else if (italicText) {
-      result.push(<em key={match.index} className="md-italic">{italicText}</em>);
-    } else if (inlineCode) {
-      result.push(<code key={match.index} className="md-inline-code">{inlineCode}</code>);
-    } else {
-      result.push(fullMatch);
-    }
-
-    lastIndex = regex.lastIndex;
-  }
-
-  if (lastIndex < text.length) {
-    result.push(text.substring(lastIndex));
-  }
-
-  return result;
-}
+// ─── Main FormattedMessage Component ─────────────────────────────────────────
 
 export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) => {
   if (!content) return null;
 
-  // Split by code blocks first
-  const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g;
-  const blocks: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
+  return (
+    <div className="formatted-message-body">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        components={{
+          // Paragraphs
+          p: ({ children }) => (
+            <p className="md-paragraph">{children}</p>
+          ),
 
-  while ((match = codeBlockRegex.exec(content)) !== null) {
-    if (match.index > lastIndex) {
-      const textChunk = content.substring(lastIndex, match.index);
-      blocks.push(renderTextBlocks(textChunk, `text-${lastIndex}`));
-    }
+          // Headings
+          h1: ({ children }) => <h1 className="md-h1">{children}</h1>,
+          h2: ({ children }) => <h2 className="md-h2">{children}</h2>,
+          h3: ({ children }) => <h3 className="md-h3">{children}</h3>,
+          h4: ({ children }) => <h4 className="md-h4">{children}</h4>,
 
-    const lang = match[1] || '';
-    const code = match[2].trim();
-    blocks.push(<CodeBlock key={`code-${match.index}`} language={lang} code={code} />);
+          // Bold & Italic
+          strong: ({ children }) => <strong className="md-bold">{children}</strong>,
+          em: ({ children }) => <em className="md-italic">{children}</em>,
 
-    lastIndex = codeBlockRegex.lastIndex;
-  }
+          // Horizontal Rule
+          hr: () => <hr className="md-hr" />,
 
-  if (lastIndex < content.length) {
-    const textChunk = content.substring(lastIndex);
-    blocks.push(renderTextBlocks(textChunk, `text-${lastIndex}`));
-  }
+          // Blockquote
+          blockquote: ({ children }) => (
+            <blockquote className="md-blockquote">{children}</blockquote>
+          ),
 
-  return <div className="formatted-message-body">{blocks}</div>;
+          // Lists
+          ul: ({ children }) => <ul className="md-unordered-list">{children}</ul>,
+          ol: ({ children }) => <ol className="md-ordered-list">{children}</ol>,
+          li: ({ children }) => (
+            <li className="md-list-item md-ul-item">
+              <div className="md-item-content">{children}</div>
+            </li>
+          ),
+
+          // Links
+          a: ({ href, children }) => {
+            const url = href || '';
+            const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+
+            if (isYouTube) {
+              return (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="md-yt-link-chip"
+                  title={`Watch YouTube: ${children}`}
+                >
+                  <span className="yt-badge-icon">
+                    <YouTubeIcon />
+                  </span>
+                  <span className="yt-link-title">{children}</span>
+                  <span className="yt-action-label">
+                    Watch <ExternalLinkIcon />
+                  </span>
+                </a>
+              );
+            }
+
+            return (
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="md-link"
+              >
+                {children}
+                <ExternalLinkIcon />
+              </a>
+            );
+          },
+
+          // Inline Code & Code Blocks
+          code: ({ className, children, ...props }) => {
+            const match = /language-(\w+)/.exec(className || '');
+            // react-markdown v9: block code is inside <pre><code>, inline has no parent pre
+            // We detect block code via the presence of a language class
+            const isBlock = Boolean(match);
+            const codeString = String(children).replace(/\n$/, '');
+
+            if (isBlock) {
+              return <CodeBlock language={match ? match[1] : ''} code={codeString} />;
+            }
+
+            return (
+              <code className="md-inline-code" {...props}>
+                {children}
+              </code>
+            );
+          },
+
+          // Suppress default <pre> wrapper since CodeBlock handles it
+          pre: ({ children }) => <>{children}</>,
+
+          // Tables (GFM)
+          table: ({ children }) => (
+            <div className="md-table-wrap">
+              <table className="md-table">{children}</table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="md-thead">{children}</thead>,
+          tbody: ({ children }) => <tbody>{children}</tbody>,
+          tr: ({ children }) => <tr className="md-tr">{children}</tr>,
+          th: ({ children }) => <th className="md-th">{children}</th>,
+          td: ({ children }) => <td className="md-td">{children}</td>,
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
 };
-
-function renderTextBlocks(text: string, keyPrefix: string): React.ReactNode {
-  const lines = text.split('\n');
-  const elements: React.ReactNode[] = [];
-
-  let currentListItems: React.ReactNode[] = [];
-  let currentListType: 'ol' | 'ul' | null = null;
-
-  const flushList = () => {
-    if (currentListItems.length > 0 && currentListType) {
-      if (currentListType === 'ol') {
-        elements.push(
-          <ol key={`${keyPrefix}-list-${elements.length}`} className="md-ordered-list">
-            {currentListItems}
-          </ol>
-        );
-      } else {
-        elements.push(
-          <ul key={`${keyPrefix}-list-${elements.length}`} className="md-unordered-list">
-            {currentListItems}
-          </ul>
-        );
-      }
-      currentListItems = [];
-      currentListType = null;
-    }
-  };
-
-  lines.forEach((line, idx) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      flushList();
-      return;
-    }
-
-    // Header 1 (# ...)
-    if (trimmed.startsWith('# ')) {
-      flushList();
-      elements.push(
-        <h1 key={`${keyPrefix}-${idx}`} className="md-h1">
-          {parseInline(trimmed.substring(2))}
-        </h1>
-      );
-      return;
-    }
-
-    // Header 2 (## ...)
-    if (trimmed.startsWith('## ')) {
-      flushList();
-      elements.push(
-        <h2 key={`${keyPrefix}-${idx}`} className="md-h2">
-          {parseInline(trimmed.substring(3))}
-        </h2>
-      );
-      return;
-    }
-
-    // Header 3 (### ...)
-    if (trimmed.startsWith('### ')) {
-      flushList();
-      elements.push(
-        <h3 key={`${keyPrefix}-${idx}`} className="md-h3">
-          {parseInline(trimmed.substring(4))}
-        </h3>
-      );
-      return;
-    }
-
-    // Ordered list (1. ..., 2. ...)
-    const olMatch = /^(\d+)\.\s+(.*)$/.exec(trimmed);
-    if (olMatch) {
-      if (currentListType && currentListType !== 'ol') {
-        flushList();
-      }
-      currentListType = 'ol';
-      const num = olMatch[1];
-      const itemText = olMatch[2];
-      currentListItems.push(
-        <li key={`item-${idx}`} className="md-list-item md-ol-item">
-          <span className="md-ol-num">{num}</span>
-          <div className="md-item-content">{parseInline(itemText)}</div>
-        </li>
-      );
-      return;
-    }
-
-    // Unordered list (- ... or * ...)
-    const ulMatch = /^[-*]\s+(.*)$/.exec(trimmed);
-    if (ulMatch) {
-      if (currentListType && currentListType !== 'ul') {
-        flushList();
-      }
-      currentListType = 'ul';
-      const itemText = ulMatch[1];
-      currentListItems.push(
-        <li key={`item-${idx}`} className="md-list-item md-ul-item">
-          <span className="md-bullet">•</span>
-          <div className="md-item-content">{parseInline(itemText)}</div>
-        </li>
-      );
-      return;
-    }
-
-    // Normal Paragraph
-    flushList();
-    elements.push(
-      <p key={`${keyPrefix}-${idx}`} className="md-paragraph">
-        {parseInline(line)}
-      </p>
-    );
-  });
-
-  flushList();
-
-  return <React.Fragment key={keyPrefix}>{elements}</React.Fragment>;
-}
 
 export default FormattedMessage;

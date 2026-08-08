@@ -1,0 +1,283 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ThoughtProcess — Tool Call Vertical-Line UI
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Container ───────────────────────────────────────────────────────────── */
+
+.tp-container {
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ─── Header Toggle Button ────────────────────────────────────────────────── */
+
+.tp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  gap: 8px;
+  text-align: left;
+}
+
+.tp-header:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.tp-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.tp-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-teal, #67e8f9);
+  flex-shrink: 0;
+}
+
+.tp-header-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-secondary, #b7b4ac);
+  white-space: nowrap;
+}
+
+/* ─── Status Badges ───────────────────────────────────────────────────────── */
+
+.tp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}
+
+.tp-badge--done {
+  background: rgba(74, 222, 128, 0.1);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.25);
+}
+
+.tp-badge--active {
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+}
+
+/* ─── Chevron Animation ───────────────────────────────────────────────────── */
+
+.tp-chevron {
+  color: rgba(255, 255, 255, 0.4);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.tp-header:hover .tp-chevron {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.tp-chevron--open {
+  transform: rotate(180deg);
+}
+
+/* ─── Spinner ─────────────────────────────────────────────────────────────── */
+
+.tp-spinner {
+  animation: tp-spin 1s linear infinite;
+  color: #fbbf24;
+}
+
+@keyframes tp-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ─── Steps Container (vertical line) ────────────────────────────────────── */
+
+.tp-steps {
+  position: relative;
+  margin-top: 8px;
+  margin-left: 12px;
+  padding-left: 16px;
+  border-left: 2px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  animation: tp-steps-in 0.2s ease;
+}
+
+@keyframes tp-steps-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Individual Step ─────────────────────────────────────────────────────── */
+
+.tp-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+/* Connector dot on the vertical line */
+.tp-step-dot {
+  position: absolute;
+  left: -21px;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(74, 222, 128, 0.7);
+  border: 2px solid rgba(74, 222, 128, 0.3);
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.3);
+  flex-shrink: 0;
+}
+
+.tp-step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+}
+
+/* ─── Step Header ─────────────────────────────────────────────────────────── */
+
+.tp-step-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 7px;
+  transition: background 0.12s ease;
+}
+
+.tp-step-header--clickable {
+  cursor: pointer;
+}
+
+.tp-step-header--clickable:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.tp-step-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+
+.tp-step-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary, #f2f0ec);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tp-step-badge {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.tp-step-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.tp-step-header--clickable:hover .tp-step-toggle {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* ─── Expandable Detail Panel ─────────────────────────────────────────────── */
+
+.tp-step-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-left: 4px;
+  margin-top: 2px;
+  animation: tp-steps-in 0.18s ease;
+}
+
+.tp-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.tp-detail-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding-left: 4px;
+}
+
+.tp-detail-code {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #d4d4d8;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Subtle scrollbar for detail code */
+.tp-detail-code::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.tp-detail-code::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+.tp-detail-code::-webkit-scrollbar-track {
+  background: transparent;
+}

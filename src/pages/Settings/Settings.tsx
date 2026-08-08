@@ -28,23 +28,6 @@ export const getStoredUserSettings = (): UserSettingsData | null => {
   }
 };
 
-const GeminiSparkleLogo: React.FC<{ size?: number }> = ({ size = 28 }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path
-      d="M12 2C12 7.52285 16.4771 12 22 12C16.4771 12 12 16.4771 12 22C12 16.4771 7.52285 12 2 12C7.52285 12 12 7.52285 12 2Z"
-      fill="url(#gemini_sparkle_grad)"
-    />
-    <defs>
-      <linearGradient id="gemini_sparkle_grad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#1A73E8" />
-        <stop offset="35%" stopColor="#6E85E8" />
-        <stop offset="70%" stopColor="#A855F7" />
-        <stop offset="100%" stopColor="#F43F5E" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
 export const SettingsContent: React.FC = () => {
   const { user, getToken } = useAuth();
   const [apikey, setApikey] = useState<string>('');
@@ -212,71 +195,41 @@ export const SettingsContent: React.FC = () => {
   return (
     <div className="settings-main-content">
       <div className="settings-page-header">
-        <h1>Cài Đặt Hệ Thống</h1>
-        <p>Quản lý Google Gemini API Key, Mô hình AI và tích hợp MCP Tool Calls nội bộ.</p>
+        <h1>Cài đặt</h1>
+        <p>Quản lý API key, mô hình và tích hợp MCP.</p>
       </div>
 
       {isLoading ? (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '60px 0',
-            color: 'var(--text-secondary)',
-            gap: '12px',
-          }}
-        >
-          <div className="btn-spinner" style={{ width: 28, height: 28 }}></div>
-          <span>Đang tải cấu hình người dùng...</span>
+        <div className="settings-loading">
+          <span>Đang tải cấu hình…</span>
         </div>
       ) : (
         <>
           {message && (
             <div className={`settings-alert ${message.type}`}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                {message.type === 'success' ? (
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4L12 14.01l-3-3" />
-                ) : (
-                  <>
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </>
-                )}
-              </svg>
               <span>{message.text}</span>
             </div>
           )}
 
-          {/* Multi-Section Settings Layout */}
           <form onSubmit={handleSave} className="settings-sections-container">
-            {/* Section 1: Gemini API Key & Model */}
+            {/* Section 1: API Key & Model */}
             <div className="settings-section">
               <div className="section-header">
-                <div className="gemini-logo-wrapper">
-                  <GeminiSparkleLogo size={24} />
-                </div>
-                <div className="section-title-wrap">
-                  <h2>
-                    Google Gemini API & AI Model
-                    <span className="gemini-badge">API Config</span>
-                  </h2>
-                </div>
+                <h2>API &amp; Mô hình</h2>
+                <span className="section-desc">Kết nối tới Google Gemini.</span>
               </div>
 
               <div className="section-body">
                 <div className="form-group">
                   <div className="label-with-link">
-                    <label htmlFor="apikey">Google Gemini API Key</label>
+                    <label htmlFor="apikey">API Key</label>
                     <a
                       href="https://aistudio.google.com/app/apikey"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="helper-link"
                     >
-                      Lấy API Key miễn phí tại Google AI Studio ↗
+                      Lấy key tại Google AI Studio
                     </a>
                   </div>
                   <div className="input-with-action">
@@ -284,7 +237,7 @@ export const SettingsContent: React.FC = () => {
                       id="apikey"
                       type={showApiKey ? 'text' : 'password'}
                       className="form-control"
-                      placeholder="AIzaSy..."
+                      placeholder="AIzaSy…"
                       value={apikey}
                       onChange={(e) => setApikey(e.target.value)}
                       required
@@ -293,53 +246,40 @@ export const SettingsContent: React.FC = () => {
                       type="button"
                       className="eye-toggle-btn"
                       onClick={() => setShowApiKey(!showApiKey)}
-                      title={showApiKey ? 'Ẩn API Key' : 'Hiện API Key'}
+                      title={showApiKey ? 'Ẩn' : 'Hiện'}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        {showApiKey ? (
-                          <>
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                          </>
-                        ) : (
-                          <>
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </>
-                        )}
-                      </svg>
+                      {showApiKey ? 'Ẩn' : 'Hiện'}
                     </button>
                   </div>
                   <div className="field-hint">
                     {apikey ? (
-                      <span className="badge-saved">✓ Đã có API Key</span>
+                      <span className="badge-saved">Đã lưu API key</span>
                     ) : (
-                      <span className="badge-missing">⚠ Chưa nhập API Key</span>
+                      <span className="badge-missing">Chưa nhập API key</span>
                     )}
                   </div>
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="model">Mô hình AI (Model)</label>
+                  <label htmlFor="model">Mô hình</label>
                   <select
                     id="model"
                     className="form-control"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                   >
-                    <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (Khuyên dùng - Nhanh & Tối ưu nhất)</option>
+                    <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite — khuyên dùng</option>
                     <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
                   </select>
                 </div>
 
-                {/* Toggle Switch for AI Reasoning */}
-                <div className="toggle-switch-row" style={{ marginTop: '4px' }}>
+                <div className="toggle-switch-row">
                   <div className="toggle-info">
-                    <span className="toggle-title">Hiển thị suy luận AI (Reasoning Process)</span>
+                    <span className="toggle-title">Hiển thị suy luận</span>
                     <span className="toggle-subtext">
                       {enableReasoning
-                        ? 'Đang bật — Hiển thị tiến trình phân tích & tư duy từng bước của AI khi phản hồi.'
-                        : 'Đang tắt — Ẩn các bước suy luận trung gian.'}
+                        ? 'Đang bật — hiển thị các bước suy luận của mô hình.'
+                        : 'Đang tắt — ẩn các bước suy luận trung gian.'}
                     </span>
                   </div>
                   <button
@@ -348,7 +288,6 @@ export const SettingsContent: React.FC = () => {
                     aria-checked={enableReasoning}
                     className={`toggle-switch-btn ${enableReasoning ? 'on' : 'off'}`}
                     onClick={() => setEnableReasoning(!enableReasoning)}
-                    title={enableReasoning ? 'Click để tắt hiển thị suy luận' : 'Click để bật hiển thị suy luận'}
                   >
                     <span className="toggle-switch-thumb" />
                   </button>
@@ -356,31 +295,33 @@ export const SettingsContent: React.FC = () => {
               </div>
             </div>
 
-            {/* Section 2: MCP Tools Integration */}
+            {/* Section 2: MCP */}
             <div className="settings-section">
               <div className="section-header">
-                <div className="mcp-icon-wrapper">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                  </svg>
-                </div>
-                <div className="section-title-wrap">
-                  <h2>
-                    Model Context Protocol (MCP) Tools
-                    <span className="mcp-badge">Integration</span>
-                  </h2>
-                </div>
+                <h2>MCP Tools</h2>
+                <span className="section-desc">Kết nối công cụ tra cứu nội bộ.</span>
               </div>
 
               <div className="section-body">
-                {/* Toggle Switch Button (Instead of Checkbox) */}
+                <div className="form-group">
+                  <label htmlFor="mcpurl">Địa chỉ máy chủ MCP</label>
+                  <input
+                    id="mcpurl"
+                    type="text"
+                    className="form-control"
+                    placeholder={DEFAULT_MCP_SERVER_URL}
+                    value={mcpServerUrl}
+                    onChange={(e) => setMcpServerUrl(e.target.value)}
+                  />
+                </div>
+
                 <div className="toggle-switch-row">
                   <div className="toggle-info">
-                    <span className="toggle-title">Bật tích hợp MCP Tools</span>
+                    <span className="toggle-title">Bật MCP Tools</span>
                     <span className="toggle-subtext">
                       {enableMcp
-                        ? 'Đang bật — AI có thể gọi các công cụ tra cứu MCP nội bộ.'
-                        : 'Đang tắt — AI sẽ chỉ trả lời dựa trên dữ liệu học có sẵn.'}
+                        ? 'Đang bật — mô hình có thể gọi công cụ MCP.'
+                        : 'Đang tắt — chỉ trả lời dựa trên dữ liệu sẵn có.'}
                     </span>
                   </div>
                   <button
@@ -389,7 +330,6 @@ export const SettingsContent: React.FC = () => {
                     aria-checked={enableMcp}
                     className={`toggle-switch-btn ${enableMcp ? 'on' : 'off'}`}
                     onClick={() => setEnableMcp(!enableMcp)}
-                    title={enableMcp ? 'Click để tắt MCP Tools' : 'Click để bật MCP Tools'}
                   >
                     <span className="toggle-switch-thumb" />
                   </button>
@@ -397,23 +337,9 @@ export const SettingsContent: React.FC = () => {
               </div>
             </div>
 
-            {/* Bottom Actions Bar */}
             <div className="settings-actions-bar">
               <button type="submit" className="save-btn" disabled={isSaving}>
-                {isSaving ? (
-                  <>
-                    <span className="btn-spinner"></span> Đang lưu...
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                      <polyline points="17 21 17 13 7 13 7 21" />
-                      <polyline points="7 3 7 8 15 8" />
-                    </svg>
-                    Lưu Cấu Hình
-                  </>
-                )}
+                {isSaving ? 'Đang lưu…' : 'Lưu cấu hình'}
               </button>
             </div>
           </form>
@@ -422,9 +348,3 @@ export const SettingsContent: React.FC = () => {
     </div>
   );
 };
-
-export const SettingsPage: React.FC = () => {
-  return <SettingsContent />;
-};
-
-export default SettingsPage;

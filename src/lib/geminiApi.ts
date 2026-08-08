@@ -89,9 +89,8 @@ export async function sendGeminiChatMessage(
   const mcpUrlToUse = userSettings?.mcpServerUrl?.trim() || mcpServerUrl || DEFAULT_MCP_SERVER_URL;
   const mcpEnabled = userSettings?.enableMcp !== undefined ? userSettings.enableMcp : enableMcp;
 
-  // Model selection
   let selectedModel = (userSettings?.model || '').trim();
-  if (!selectedModel || !selectedModel.toLowerCase().startsWith('gemini-')) {
+  if (!selectedModel) {
     selectedModel = 'gemini-3.5-flash-lite';
   }
 
@@ -129,41 +128,53 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
 
     const enableReasoning = userSettings?.enableReasoning ?? true;
 
-    const chatOptions: any = {
-      model: selectedModel,
-      history,
-      config: {
-        ...(systemInstruction ? { systemInstruction } : {}),
-        ...(toolsConfig.length > 0 ? { tools: toolsConfig } : {}),
-        ...(enableReasoning ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
-      },
+    const createChatSession = (modelId: string, withReasoning: boolean) => {
+      const configObj: any = {};
+      if (systemInstruction) configObj.systemInstruction = systemInstruction;
+      if (toolsConfig.length > 0) configObj.tools = toolsConfig;
+      if (withReasoning) {
+        // includeThoughts is required for the API to actually emit thought-summary
+        // parts (part.thought === true); without it the model thinks silently.
+        configObj.thinkingConfig = { thinkingBudget: 2048, includeThoughts: true };
+      }
+
+      return ai.chats.create({
+        model: modelId,
+        history,
+        config: configObj,
+      });
     };
 
-    const chat = ai.chats.create(chatOptions);
-    const allReasoningSteps: string[] = [];
+    let chat: any;
+    try {
+      chat = createChatSession(selectedModel, enableReasoning);
+    } catch (err) {
+      console.warn(`[Gemini] Initial chat creation failed for model ${selectedModel}, retrying without reasoning config:`, err);
+      chat = createChatSession(selectedModel, false);
+    }
+
+    let accumulatedReasoning = '';
 
     const collectReasoning = (resObj: any) => {
       const candidate = resObj?.candidates?.[0];
-      if (candidate?.content?.parts) {
-        let updated = false;
-        for (const part of candidate.content.parts) {
+      const parts = candidate?.content?.parts || resObj?.parts;
+      if (Array.isArray(parts)) {
+        let chunkDelta = '';
+        for (const part of parts) {
           const pAny = part as any;
-          if (pAny.thought === true || pAny.thought) {
-            const tStr = pAny.text || (typeof pAny.thought === 'string' ? pAny.thought : '');
-            if (tStr.trim() && !allReasoningSteps.includes(tStr.trim())) {
-              allReasoningSteps.push(tStr.trim());
-              updated = true;
+          if (pAny.thought === true || (pAny.thought && typeof pAny.thought !== 'object')) {
+            if (typeof pAny.text === 'string') {
+              chunkDelta += pAny.text;
             }
-          } else if (pAny.executableCode) {
-            const codeStr = `\`\`\`python\n${pAny.executableCode.code || ''}\n\`\`\``;
-            if (!allReasoningSteps.includes(codeStr)) {
-              allReasoningSteps.push(codeStr);
-              updated = true;
-            }
+          } else if (typeof pAny.thought === 'string') {
+            chunkDelta += pAny.thought;
+          } else if (pAny.executableCode?.code) {
+            chunkDelta += `\n\`\`\`python\n${pAny.executableCode.code}\n\`\`\`\n`;
           }
         }
-        if (updated) {
-          onReasoningChunk?.(allReasoningSteps.join('\n\n').trim());
+        if (chunkDelta) {
+          accumulatedReasoning += chunkDelta;
+          onReasoningChunk?.(accumulatedReasoning);
         }
       }
     };
@@ -171,44 +182,68 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
     const getChunkText = (chunkObj: any): string => {
       if (!chunkObj) return '';
 
-      // 1. Try direct text property
-      try {
-        if (typeof chunkObj.text === 'string' && chunkObj.text.trim()) {
-          return chunkObj.text;
-        }
-      } catch {
-        // Ignore getter warning if non-text parts exist
-      }
-
-      // 2. Inspect candidate parts
       const candidate = chunkObj.candidates?.[0];
       const parts = candidate?.content?.parts || chunkObj.parts;
       if (Array.isArray(parts)) {
         let regularText = '';
-        let fallbackText = '';
         for (const part of parts) {
-          if (typeof part?.text === 'string' && !part.functionCall) {
-            fallbackText += part.text;
-            if (!part.thought) {
-              regularText += part.text;
-            }
+          const pAny = part as any;
+          // Strictly exclude thought process parts and function calls
+          const isThoughtPart = Boolean(pAny.thought);
+          if (typeof pAny.text === 'string' && !pAny.functionCall && !isThoughtPart) {
+            regularText += pAny.text;
           }
         }
-        if (regularText.trim()) return regularText;
-        if (fallbackText.trim()) return fallbackText;
+        return regularText;
       }
 
       return '';
     };
 
     let accumulatedText = '';
+
+    // Function calls can be split across streaming chunks — the last chunk is
+    // NOT guaranteed to carry them. Collect them from every chunk so a trailing
+    // text/empty chunk never drops the tool call.
+    const collectFunctionCalls = (chunkObj: any): Array<{ name: string; args: any }> => {
+      const collected: Array<{ name: string; args: any }> = [];
+      if (!chunkObj) return collected;
+
+      if (Array.isArray(chunkObj.functionCalls)) {
+        for (const fc of chunkObj.functionCalls) {
+          if (fc?.name) collected.push({ name: fc.name, args: fc.args || {} });
+        }
+      }
+
+      const parts = chunkObj.candidates?.[0]?.content?.parts || chunkObj.parts;
+      if (Array.isArray(parts)) {
+        for (const part of parts) {
+          const fc = (part as any)?.functionCall;
+          if (fc?.name) collected.push({ name: fc.name, args: fc.args || {} });
+        }
+      }
+
+      return collected;
+    };
+
     const processStream = async (msgPayload: any) => {
       let lastChunk: any = null;
+      const streamedFunctionCalls: Array<{ name: string; args: any }> = [];
+      // The SDK expects { message: <string | Part[]> }. A raw string is a plain
+      // user turn; an array is a set of functionResponse parts to send back.
+      const sendParam =
+        typeof msgPayload === 'string'
+          ? { message: msgPayload }
+          : Array.isArray(msgPayload)
+            ? { message: msgPayload }
+            : msgPayload;
+
       try {
-        const stream = await chat.sendMessageStream({ message: msgPayload });
+        const stream = await chat.sendMessageStream(sendParam as any);
         for await (const chunk of stream) {
           lastChunk = chunk;
           collectReasoning(chunk);
+          streamedFunctionCalls.push(...collectFunctionCalls(chunk));
           const cText = getChunkText(chunk);
           if (cText) {
             accumulatedText += cText;
@@ -216,45 +251,35 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
           }
         }
       } catch (streamErr) {
-        // Fallback to sendMessage if sendMessageStream fails or is unsupported
         console.warn('[Gemini Stream] Stream failed, falling back to standard response:', streamErr);
-        const singleRes = await chat.sendMessage({ message: msgPayload });
-        lastChunk = singleRes;
-        collectReasoning(singleRes);
-        const sText = getChunkText(singleRes);
-        if (sText) {
-          accumulatedText = sText;
-          onChunk?.(accumulatedText, sText);
+        try {
+          const singleRes = await chat.sendMessage(sendParam as any);
+          lastChunk = singleRes;
+          collectReasoning(singleRes);
+          streamedFunctionCalls.push(...collectFunctionCalls(singleRes));
+          const sText = getChunkText(singleRes);
+          if (sText) {
+            accumulatedText = sText;
+            onChunk?.(accumulatedText, sText);
+          }
+        } catch (fallbackErr) {
+          console.error('[Gemini sendMessage] Both stream and standard call failed:', fallbackErr);
         }
       }
-      return lastChunk;
+      return { lastChunk, functionCalls: streamedFunctionCalls };
     };
 
-    let response = await processStream(newMessageText);
+    let streamResult = await processStream(newMessageText);
+    let response = streamResult.lastChunk;
 
     // Multi-turn Tool Calling Loop
     const MAX_TURNS = 10;
     let turnCount = 0;
 
     while (turnCount < MAX_TURNS) {
-      const candidate = response?.candidates?.[0];
-      const parts = candidate?.content?.parts || [];
-
-      // Extract function calls from response
-      const functionCalls: Array<{ name: string; args: any }> = [];
-      if (response?.functionCalls && response.functionCalls.length > 0) {
-        for (const fc of response.functionCalls) {
-          if (fc.name) {
-            functionCalls.push({ name: fc.name, args: fc.args || {} });
-          }
-        }
-      } else {
-        for (const part of parts) {
-          if (part.functionCall && part.functionCall.name) {
-            functionCalls.push({ name: part.functionCall.name, args: part.functionCall.args || {} });
-          }
-        }
-      }
+      // Function calls gathered across the whole stream (see collectFunctionCalls) —
+      // more reliable than reading only the final chunk.
+      const functionCalls = streamResult.functionCalls;
 
       if (functionCalls.length === 0) {
         break;
@@ -291,15 +316,32 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
       }
 
       // Reset accumulated text for final answer after tool call turn
+      const prevText = accumulatedText;
       accumulatedText = '';
-      response = await processStream(functionResponses as any);
+      streamResult = await processStream(functionResponses as any);
+      response = streamResult.lastChunk;
+
+      // If no new text was produced after tool execution, restore previous text
+      if (!accumulatedText.trim() && prevText.trim()) {
+        accumulatedText = prevText;
+      }
     }
 
-    const finalText =
-      accumulatedText.trim() ||
-      getChunkText(response) ||
-      'Không có phản hồi từ Gemini AI.';
-    const extractedReasoning = allReasoningSteps.join('\n\n').trim();
+    let finalText = accumulatedText.trim();
+    if (!finalText && getChunkText(response)) {
+      finalText = getChunkText(response);
+    }
+
+    const extractedReasoning = accumulatedReasoning.trim();
+
+    // If regular response text is empty, but we have reasoning or tool calls, treat as valid!
+    if (!finalText) {
+      if (executedToolCalls.length > 0 || extractedReasoning.length > 0) {
+        finalText = '';
+      } else {
+        finalText = 'Không có phản hồi từ Gemini AI.';
+      }
+    }
 
     if (isOptionsObject) {
       return {
