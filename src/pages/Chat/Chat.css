@@ -523,6 +523,24 @@
   padding: 10px 24px 22px 24px;
 }
 
+.page-chat-wrapper .rate-limit-banner {
+  max-width: 720px;
+  margin: 0 auto 10px auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  color: #ffb4a2;
+  background: rgba(220, 80, 60, 0.12);
+  border: 1px solid rgba(220, 80, 60, 0.32);
+}
+
+.page-chat-wrapper .rate-limit-banner svg {
+  flex-shrink: 0;
+}
+
 .page-chat-wrapper .composer {
   max-width: 720px;
   margin: 0 auto;

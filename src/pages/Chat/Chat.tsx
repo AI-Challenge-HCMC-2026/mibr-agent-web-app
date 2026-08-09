@@ -120,6 +120,7 @@ export const Chat: React.FC = () => {
     () => getStoredUserSettings()?.model || 'gemini-3.5-flash-lite'
   );
   const [showModelMenu, setShowModelMenu] = useState(false);
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -187,6 +188,14 @@ export const Chat: React.FC = () => {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [showModelMenu]);
 
+  useEffect(() => {
+    if (rateLimitSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setRateLimitSeconds((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [rateLimitSeconds > 0]);
+
   const handleSelectModel = (modelValue: string) => {
     setSelectedModel(modelValue);
     saveUserModel(modelValue);
@@ -194,7 +203,7 @@ export const Chat: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isResponding) return;
+    if (!inputMessage.trim() || isResponding || rateLimitSeconds > 0) return;
 
     const userMsgText = inputMessage.trim();
     const messageToSend = activeCommand
@@ -292,6 +301,10 @@ export const Chat: React.FC = () => {
       const responseText = typeof result === 'string' ? result : result.text;
       const toolCalls = typeof result === 'string' ? [] : result.toolCalls;
       const reasoningText = typeof result === 'string' ? undefined : result.reasoningText;
+
+      if (typeof result !== 'string' && result.rateLimited) {
+        setRateLimitSeconds(result.retryAfterSeconds || 30);
+      }
       setSessions((prev) =>
         prev.map((session) => {
           if (session.id === activeSessionId) {
@@ -474,6 +487,19 @@ export const Chat: React.FC = () => {
       </div>
 
       <div className="composer-wrap">
+        {rateLimitSeconds > 0 && (
+          <div className="rate-limit-banner" role="alert">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>
+              Bạn đã đạt giới hạn yêu cầu (rate limit). Vui lòng thử lại sau{' '}
+              <strong>{rateLimitSeconds}s</strong>.
+            </span>
+          </div>
+        )}
         <div className="composer">
           {showCommandMenu && filteredCommands.length > 0 && (
             <div className="slash-menu">
@@ -515,12 +541,16 @@ export const Chat: React.FC = () => {
               className="composer-input"
               rows={1}
               placeholder={
-                activeCommand ? activeCommand.queryPlaceholder : 'Write a message... (type / for commands)'
+                rateLimitSeconds > 0
+                  ? `Đã đạt giới hạn — thử lại sau ${rateLimitSeconds}s...`
+                  : activeCommand
+                    ? activeCommand.queryPlaceholder
+                    : 'Write a message... (type / for commands)'
               }
               value={inputMessage}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              disabled={isResponding}
+              disabled={isResponding || rateLimitSeconds > 0}
             />
           </div>
           <div className="composer-controls">
@@ -569,7 +599,7 @@ export const Chat: React.FC = () => {
                 <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
                 <line x1="12" y1="19" x2="12" y2="23" />
               </svg>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ cursor: 'pointer' }} onClick={handleSendMessage}>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ cursor: rateLimitSeconds > 0 || isResponding ? 'not-allowed' : 'pointer', opacity: rateLimitSeconds > 0 ? 0.4 : 1 }} onClick={handleSendMessage}>
                 <line x1="22" y1="2" x2="11" y2="13" />
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>

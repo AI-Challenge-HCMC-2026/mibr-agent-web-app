@@ -36,6 +36,40 @@ export interface GeminiChatResponse {
   text: string;
   toolCalls: ToolCallInfo[];
   reasoningText?: string;
+  rateLimited?: boolean;
+  retryAfterSeconds?: number;
+}
+
+// Extracts rate-limit info from a Gemini 429 (RESOURCE_EXHAUSTED) error.
+// Returns null if the error is not a rate-limit error.
+export function parseRateLimitError(error: unknown): { retryAfterSeconds: number } | null {
+  const raw =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  const anyErr = error as any;
+  const code = anyErr?.status ?? anyErr?.code ?? anyErr?.error?.code;
+
+  const isRateLimit =
+    code === 429 ||
+    code === 'RESOURCE_EXHAUSTED' ||
+    /RESOURCE_EXHAUSTED|"code"\s*:\s*429|exceeded your current quota|rate limit/i.test(raw);
+
+  if (!isRateLimit) return null;
+
+  // retryDelay comes back like "13s" or "13.26s"; fall back to a JSON-embedded value.
+  let seconds = 0;
+  const delayMatch = raw.match(/retry(?:Delay|\s*in)["\s:]*([\d.]+)\s*s/i);
+  if (delayMatch) {
+    seconds = parseFloat(delayMatch[1]);
+  } else {
+    const structured = anyErr?.error?.details?.find?.(
+      (d: any) => typeof d?.retryDelay === 'string'
+    );
+    if (structured) {
+      seconds = parseFloat(String(structured.retryDelay));
+    }
+  }
+
+  return { retryAfterSeconds: Math.max(1, Math.ceil(seconds || 30)) };
 }
 
 export async function sendGeminiChatMessage(
@@ -95,6 +129,7 @@ export async function sendGeminiChatMessage(
   }
 
   const executedToolCalls: ToolCallInfo[] = [];
+  let rateLimitInfo: { retryAfterSeconds: number } | null = null;
 
   try {
     const ai = new GoogleGenAI({ apiKey });
@@ -251,6 +286,11 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
           }
         }
       } catch (streamErr) {
+        const streamRateLimit = parseRateLimitError(streamErr);
+        if (streamRateLimit) {
+          rateLimitInfo = streamRateLimit;
+          throw streamErr;
+        }
         console.warn('[Gemini Stream] Stream failed, falling back to standard response:', streamErr);
         try {
           const singleRes = await chat.sendMessage(sendParam as any);
@@ -263,6 +303,11 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
             onChunk?.(accumulatedText, sText);
           }
         } catch (fallbackErr) {
+          const fallbackRateLimit = parseRateLimitError(fallbackErr);
+          if (fallbackRateLimit) {
+            rateLimitInfo = fallbackRateLimit;
+            throw fallbackErr;
+          }
           console.error('[Gemini sendMessage] Both stream and standard call failed:', fallbackErr);
         }
       }
@@ -354,6 +399,18 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
     return finalText;
   } catch (error: unknown) {
     console.error('Gemini Chat API Error:', error);
+    const rateLimit = rateLimitInfo || parseRateLimitError(error);
+    if (rateLimit) {
+      const rlMsg = `Bạn đã đạt giới hạn số lượng yêu cầu (rate limit). Vui lòng thử lại sau ${rateLimit.retryAfterSeconds} giây.`;
+      return isOptionsObject
+        ? {
+            text: rlMsg,
+            toolCalls: executedToolCalls,
+            rateLimited: true,
+            retryAfterSeconds: rateLimit.retryAfterSeconds,
+          }
+        : rlMsg;
+    }
     const errorMessage = error instanceof Error ? error.message : String(error);
     const fullErr = `Lỗi kết nối Gemini AI: ${errorMessage}`;
     return isOptionsObject ? { text: fullErr, toolCalls: executedToolCalls } : fullErr;
