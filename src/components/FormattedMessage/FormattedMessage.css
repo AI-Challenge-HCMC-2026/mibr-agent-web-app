@@ -280,6 +280,45 @@
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* ─── Links inside tables ─────────────────────────────────────────────────── */
+/* Table cells are narrow: render links compactly so they wrap cleanly instead
+   of overflowing. YouTube chips collapse to a tidy icon+label chip. */
+
+.md-td .md-link {
+  gap: 3px;
+  overflow-wrap: anywhere;
+}
+
+.md-td .md-yt-link-chip {
+  gap: 6px;
+  padding: 3px 9px;
+  font-size: 12.5px;
+  max-width: 100%;
+  box-shadow: none;
+}
+
+.md-td .md-yt-link-chip:hover {
+  transform: none;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.18);
+}
+
+.md-td .md-yt-link-chip .yt-link-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* In tables the "Watch" call-to-action is redundant clutter — hide it. */
+.md-td .md-yt-link-chip .yt-action-label {
+  display: none;
+}
+
+.md-td .md-yt-link-chip .yt-badge-icon {
+  width: 18px;
+  height: 18px;
+}
+
 /* ─── Code Blocks ─────────────────────────────────────────────────────────── */
 
 .md-code-block {
