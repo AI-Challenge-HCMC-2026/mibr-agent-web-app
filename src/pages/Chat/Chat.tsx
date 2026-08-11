@@ -7,6 +7,14 @@ import { ThoughtProcess, ReasoningProcess } from '../../components/FormattedMess
 import ChatLayout, { type ChatSession } from '../../components/ChatLayout/ChatLayout';
 import { getStoredUserSettings, saveUserModel, AVAILABLE_MODELS } from '../Settings/Settings';
 import { filterCommands, type SlashCommand } from './slashCommands';
+import {
+  fetchChatSessions,
+  fetchSessionMessages,
+  saveChatMessage,
+  deleteChatSession,
+  deleteAllChatHistory,
+  newSessionId,
+} from '../../lib/chatHistoryApi';
 import '../Settings/Settings.css';
 import './Chat.css';
 
@@ -18,75 +26,6 @@ interface Message {
   toolCalls?: ToolCallInfo[];
   reasoning?: string;
 }
-
-const INITIAL_SESSIONS: ChatSession[] = [
-  {
-    id: 'session-1',
-    title: 'Recreating Claude.ai website in HTML',
-    messages: [
-      {
-        id: 'm1',
-        sender: 'user',
-        content: "Let's create a static html that clearly shows a perfect copy of claude.ai website",
-      },
-      {
-        id: 'm2',
-        sender: 'assistant',
-        eyebrow: 'Weighed intellectual property concerns against alternative design solutions',
-        content: `I can't create an exact replica of claude.ai — copying a company's specific branded design, logo, and interface that closely isn't something I can do, partly for IP reasons and partly because a pixel-perfect clone of a live product's UI could be misused (e.g., for phishing or impersonation).
-
-What I **can** do instead:
-1. **A chat-UI inspired by claude.ai's general style** — clean minimalist layout, sidebar with conversation history, message bubbles, similar color palette/spacing — built as an original design, not a literal copy of Anthropic's trademarked assets (logo, exact fonts/branding).
-2. **A generic AI chat interface template** you can customize and reuse for your own projects.`,
-      },
-    ],
-  },
-  {
-    id: 'session-2',
-    title: 'Video chunking cho search engine',
-    messages: [
-      {
-        id: 'm3',
-        sender: 'user',
-        content: 'Làm thế nào để cắt nhỏ (chunking) video hiệu quả để đưa vào cơ sở dữ liệu tìm kiếm vector?',
-      },
-      {
-        id: 'm4',
-        sender: 'assistant',
-        content: `Cắt nhỏ video cho hệ thống tìm kiếm vector (như RAG đa phương tiện) có thể thực hiện theo một số cách chính:
-
-1. **Chunking theo thời gian cố định (Fixed-time sliding window)**: Cắt video mỗi 15-30 giây. Đơn giản nhất nhưng dễ mất ngữ cảnh ở giữa các phân đoạn.
-2. **Scene Detection (Phát hiện cảnh chuyển)**: Sử dụng các thư viện như \`PySceneDetect\` để cắt tại các điểm chuyển giao camera tự nhiên. Mỗi cảnh sẽ đại diện cho một hành động/chủ đề cụ thể.
-3. **Chunking dựa trên Transcripts (Văn bản thuyết minh)**: Đồng bộ phụ đề (SRT/VTT) và cắt video dựa trên ranh giới các đoạn hội thoại hoặc đoạn văn sau khi phân tích ngữ nghĩa bằng các LLM/NLU.
-
-Cách tiếp cận tối ưu là kết hợp **Scene Detection** cùng với việc trích xuất **Keyframes** và chạy mô hình **Vision-Language** (như CLIP hoặc Whisper cho âm thanh) để tạo embedding cho từng phân đoạn cảnh đó.`,
-      },
-    ],
-  },
-  {
-    id: 'session-3',
-    title: 'Function calling và MCP cho AI agents',
-    messages: [
-      {
-        id: 'm5',
-        sender: 'user',
-        content: 'Sự khác biệt lớn nhất giữa Function Calling truyền thống và Model Context Protocol (MCP) là gì?',
-      },
-      {
-        id: 'm6',
-        sender: 'assistant',
-        content: `Sự khác biệt lớn nhất nằm ở **Kiến trúc và Tính chuẩn hóa**:
-
-- **Function Calling**: Mỗi hệ thống hoặc API định nghĩa schema JSON riêng và truyền trực tiếp vào LLM. AI Agent phải tự định dạng payload, gọi hàm cục bộ hoặc qua HTTP, sau đó trả kết quả về cho mô hình. Mỗi agent/project thường có cách triển khai độc quyền.
-- **Model Context Protocol (MCP)**: Là một giao thức client-server chuẩn hóa do Anthropic đề xuất. MCP tách biệt vai trò rõ ràng:
-  - **MCP Servers**: Cung cấp tài nguyên (files, DB), công cụ (tools) và prompt template qua một API đồng nhất.
-  - **MCP Clients (như Claude Desktop, Antigravity)**: Kết nối với nhiều máy chủ MCP một cách dễ dàng mà không cần phải viết code wrapper riêng biệt cho từng API.
-
-MCP giúp việc tích hợp các công cụ bên ngoài trở nên cắm-là-chạy (plug-and-play) giống như giao thức LSP (Language Server Protocol) trong phát triển IDE.`,
-      },
-    ],
-  },
-];
 
 const DEFAULT_CONTEXT_LIMIT = 256_000;
 const GEMMA_CONTEXT_LIMIT = 16_000;
@@ -117,9 +56,10 @@ const formatModelLabel = (modelKey?: string) => {
 export const Chat: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { getToken } = useAuth();
-  const [sessions, setSessions] = useState<ChatSession[]>(INITIAL_SESSIONS);
-  const [activeSessionId, setActiveSessionId] = useState<string>('session-1');
+  const { user, getToken } = useAuth();
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [inputMessage, setInputMessage] = useState('');
   const [activeCommand, setActiveCommand] = useState<SlashCommand | null>(null);
   const [showCommandMenu, setShowCommandMenu] = useState(false);
@@ -141,25 +81,81 @@ export const Chat: React.FC = () => {
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) || sessions[0];
 
+  const createLocalSession = (): ChatSession => ({
+    id: newSessionId(),
+    title: 'New chat',
+    messages: [],
+    loaded: true,
+  });
+
   const handleNewChat = () => {
-    const newSessionId = `session-${Date.now()}`;
-    const newSession: ChatSession = {
-      id: newSessionId,
-      title: `New chat ${sessions.length + 1}`,
-      messages: [],
-    };
+    const newSession = createLocalSession();
     setSessions((prev) => [newSession, ...prev]);
-    setActiveSessionId(newSessionId);
+    setActiveSessionId(newSession.id);
   };
+
+  // Load the user's chat sessions from the history API once on mount / login.
+  useEffect(() => {
+    let cancelled = false;
+    const loadSessions = async () => {
+      if (!user?.id) {
+        // Not logged in yet — start with a single empty local session.
+        const fresh = createLocalSession();
+        setSessions([fresh]);
+        setActiveSessionId(fresh.id);
+        setIsLoadingHistory(false);
+        return;
+      }
+      setIsLoadingHistory(true);
+      try {
+        const token = await getToken();
+        const remote = await fetchChatSessions(user.id, token);
+        if (cancelled) return;
+        const mapped: ChatSession[] = remote.map((s) => ({
+          id: s.session_id,
+          title: s.title || 'Untitled chat',
+          messages: [],
+          loaded: false,
+        }));
+        if (mapped.length === 0) {
+          const fresh = createLocalSession();
+          setSessions([fresh]);
+          setActiveSessionId(fresh.id);
+        } else {
+          setSessions(mapped);
+          setActiveSessionId(mapped[0].id);
+        }
+      } catch (err) {
+        console.error('[Chat] Failed to load chat sessions:', err);
+        if (!cancelled) {
+          const fresh = createLocalSession();
+          setSessions([fresh]);
+          setActiveSessionId(fresh.id);
+        }
+      } finally {
+        if (!cancelled) setIsLoadingHistory(false);
+      }
+    };
+    loadSessions();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleDeleteSession = (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (user?.id) {
+      getToken()
+        .then((token) => deleteChatSession(sessionId, user.id, token))
+        .catch((err) => console.error('[Chat] Failed to delete session:', err));
+    }
     setSessions((prev) => {
       const updated = prev.filter((s) => s.id !== sessionId);
       if (updated.length === 0) {
-        const newId = `session-${Date.now()}`;
-        setActiveSessionId(newId);
-        return [{ id: newId, title: 'New chat', messages: [] }];
+        const fresh = createLocalSession();
+        setActiveSessionId(fresh.id);
+        return [fresh];
       }
       if (activeSessionId === sessionId) {
         setActiveSessionId(updated[0].id);
@@ -171,6 +167,58 @@ export const Chat: React.FC = () => {
   const handleRenameSession = (sessionId: string, title: string) => {
     setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, title } : s)));
   };
+
+  const handleClearAllHistory = async () => {
+    if (!user?.id) return;
+    try {
+      const token = await getToken();
+      await deleteAllChatHistory(user.id, token);
+    } catch (err) {
+      console.error('[Chat] Failed to clear chat history:', err);
+    }
+    const fresh = createLocalSession();
+    setSessions([fresh]);
+    setActiveSessionId(fresh.id);
+  };
+
+  // Lazily fetch the message history of whichever session is currently open.
+  const activeSessionLoaded = sessions.find((s) => s.id === activeSessionId)?.loaded;
+  useEffect(() => {
+    const session = sessions.find((s) => s.id === activeSessionId);
+    if (!session || session.loaded || !user?.id) return;
+
+    let cancelled = false;
+    const loadMessages = async () => {
+      try {
+        const token = await getToken();
+        const remote = await fetchSessionMessages(session.id, user.id, token);
+        if (cancelled) return;
+        const messages: Message[] = remote.map((m) => ({
+          id: String(m.message_id),
+          sender: m.role === 'user' ? 'user' : 'assistant',
+          content: m.content,
+          eyebrow: m.role === 'user' ? undefined : (m.metadata?.model as string | undefined),
+          toolCalls: (m.metadata?.toolCalls as ToolCallInfo[] | undefined) || undefined,
+          reasoning: (m.metadata?.reasoning as string | undefined) || undefined,
+        }));
+        setSessions((prev) =>
+          prev.map((s) => (s.id === session.id ? { ...s, messages, loaded: true } : s))
+        );
+      } catch (err) {
+        console.error('[Chat] Failed to load session messages:', err);
+        if (!cancelled) {
+          setSessions((prev) =>
+            prev.map((s) => (s.id === session.id ? { ...s, loaded: true } : s))
+          );
+        }
+      }
+    };
+    loadMessages();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, user?.id, activeSessionLoaded]);
 
   useEffect(() => {
     if (location.state?.createNewChat) {
@@ -243,6 +291,13 @@ export const Chat: React.FC = () => {
     };
 
     const currentHistory = activeSession ? activeSession.messages : [];
+    const isNewSession =
+      !activeSession ||
+      activeSession.title === 'New chat' ||
+      activeSession.title.startsWith('New chat');
+    const sessionTitleForSave = isNewSession
+      ? userMsgText.slice(0, 60)
+      : activeSession?.title;
 
     setSessions((prev) =>
       prev.map((session) => {
@@ -264,6 +319,24 @@ export const Chat: React.FC = () => {
     setIsResponding(true);
     setActiveToolStatus(null);
     setStreamingBotMsgId(botMsgId);
+
+    // Persist the user's message immediately (auto-creates the session server-side).
+    if (user?.id) {
+      getToken()
+        .then((token) =>
+          saveChatMessage(
+            {
+              session_id: activeSessionId,
+              user_id: user.id,
+              role: 'user',
+              content: userMsgText,
+              title: sessionTitleForSave,
+            },
+            token
+          )
+        )
+        .catch((err) => console.error('[Chat] Failed to persist user message:', err));
+    }
 
     try {
       const userToken = await getToken();
@@ -347,6 +420,32 @@ export const Chat: React.FC = () => {
           return session;
         })
       );
+
+      const persistedContent =
+        typeof responseText === 'string' && responseText.trim() ? responseText : '';
+      if (user?.id && persistedContent) {
+        try {
+          const token = await getToken();
+          await saveChatMessage(
+            {
+              session_id: activeSessionId,
+              user_id: user.id,
+              role: 'assistant',
+              content: persistedContent,
+              metadata: {
+                model: modelDisplayName,
+                reasoning: reasoningText,
+                toolCalls: toolCalls && toolCalls.length > 0 ? toolCalls : undefined,
+                totalTokenCount,
+              },
+              title: sessionTitleForSave,
+            },
+            token
+          );
+        } catch (persistErr) {
+          console.error('[Chat] Failed to persist assistant message:', persistErr);
+        }
+      }
     } catch (err) {
       console.error('Error generating Gemini response:', err);
     } finally {
@@ -433,6 +532,7 @@ export const Chat: React.FC = () => {
       onNewChat={handleNewChat}
       onDeleteSession={handleDeleteSession}
       onRenameSession={handleRenameSession}
+      onClearAllHistory={user?.id ? handleClearAllHistory : undefined}
     >
       <div className="topbar">
         <div className="topbar-left">
@@ -448,7 +548,11 @@ export const Chat: React.FC = () => {
 
       <div className="chat-area" ref={chatAreaRef}>
         <div className="chat-inner">
-          {activeSession && activeSession.messages.length === 0 ? (
+          {isLoadingHistory ? (
+            <div style={{ textAlign: 'center', marginTop: '100px', color: 'var(--text-secondary)' }}>
+              <p>Đang tải lịch sử trò chuyện…</p>
+            </div>
+          ) : activeSession && activeSession.messages.length === 0 ? (
             <div style={{ textAlign: 'center', marginTop: '100px', color: 'var(--text-secondary)' }}>
               <h2>Start a new conversation</h2>
               <p style={{ marginTop: '10px' }}>Type a message below to begin chatting with the AI.</p>

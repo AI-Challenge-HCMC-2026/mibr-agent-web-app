@@ -9,6 +9,8 @@ export interface ChatSession {
   messages: any[];
   /** Server-reported token usage from the latest Gemini turn. */
   tokenCount?: number;
+  /** False until this session's messages have been fetched from the history API. */
+  loaded?: boolean;
 }
 
 interface ChatLayoutProps {
@@ -21,6 +23,8 @@ interface ChatLayoutProps {
   onNewChat?: () => void;
   onDeleteSession?: (id: string, e: React.MouseEvent) => void;
   onRenameSession?: (id: string, title: string) => void;
+  /** Wipes every session of the logged-in user via the chat history API. */
+  onClearAllHistory?: () => void;
   children: React.ReactNode;
 }
 
@@ -34,6 +38,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
   onNewChat,
   onDeleteSession,
   onRenameSession,
+  onClearAllHistory,
   children,
 }) => {
   const navigate = useNavigate();
@@ -178,7 +183,25 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
           <div className="recents-container">
             <div className="recents-header">
               <span>Recent chats</span>
-              <span className="recents-count">{sessions.length}</span>
+              <div className="recents-header-right">
+                <span className="recents-count">{sessions.length}</span>
+                {onClearAllHistory && (
+                  <button
+                    className="recents-clear-btn"
+                    title="Xóa toàn bộ lịch sử chat"
+                    onClick={() => {
+                      if (window.confirm('Xóa toàn bộ lịch sử trò chuyện? Hành động này không thể hoàn tác.')) {
+                        onClearAllHistory();
+                      }
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="recent-list">

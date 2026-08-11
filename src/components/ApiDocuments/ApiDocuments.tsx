@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { CHAT_HISTORY_API_HOST } from '../../lib/chatHistoryApi';
 import './ApiDocuments.css';
 
 interface ApiDocumentsProps {
@@ -7,153 +8,155 @@ interface ApiDocumentsProps {
 }
 
 interface EndpointItem {
+  key: string;
   path: string;
   method: string;
+  operationId?: string;
   summary?: string;
   description?: string;
-  parameters?: any[];
+  parameters: any[];
   requestBody?: any;
-  responses?: any;
-  tags?: string[];
+  responses: Record<string, any>;
+  tags: string[];
 }
 
-// Helper to resolve OpenAPI $ref pointers (e.g. #/components/parameters/rowFilter.account.id)
-const resolveRef = (refStr: string, rootObj: any): any => {
+interface SchemaDetailsProps {
+  schema: any;
+  root: any;
+  compact?: boolean;
+}
+
+const API_HOST = CHAT_HISTORY_API_HOST;
+const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
+
+const resolveRef = (refStr: string | undefined, rootObj: any): any => {
   if (!refStr || typeof refStr !== 'string' || !refStr.startsWith('#/')) return null;
-  const parts = refStr.replace(/^#\//, '').split('/');
-  let current = rootObj;
-  for (const p of parts) {
-    if (current && typeof current === 'object' && p in current) {
-      current = current[p];
-    } else {
-      return null;
-    }
-  }
-  return current;
+  return refStr
+    .replace(/^#\//, '')
+    .split('/')
+    .map((part) => part.replace(/~1/g, '/').replace(/~0/g, '~'))
+    .reduce((current, part) => (current && typeof current === 'object' ? current[part] : null), rootObj);
 };
 
-// Helper to resolve a parameter object (whether inline or $ref)
-const resolveParam = (paramObj: any, rootObj: any): any => {
-  if (!paramObj) return paramObj;
-  if (paramObj['$ref']) {
-    const resolved = resolveRef(paramObj['$ref'], rootObj);
-    if (resolved) {
-      const fallbackName = paramObj['$ref'].split('/').pop();
-      return {
-        ...resolved,
-        name: resolved.name || fallbackName,
-        refPath: paramObj['$ref'],
-      };
-    }
+const resolveObject = (value: any, rootObj: any): any => {
+  if (!value || typeof value !== 'object') return value;
+  if (value.$ref) return resolveRef(value.$ref, rootObj) || value;
+  return value;
+};
+
+const schemaType = (schema: any, rootObj: any): string => {
+  const resolved = resolveObject(schema, rootObj) || {};
+  if (resolved.$ref) return resolved.$ref.split('/').pop() || 'object';
+  if (resolved.enum) return `${resolved.type || 'string'} (enum)`;
+  if (resolved.anyOf) return resolved.anyOf.map((item: any) => schemaType(item, rootObj)).join(' | ');
+  if (resolved.type === 'array') return `${schemaType(resolved.items, rootObj)}[]`;
+  return [resolved.type, resolved.format].filter(Boolean).join(' / ') || 'object';
+};
+
+const exampleForSchema = (schema: any, rootObj: any): any => {
+  const resolved = resolveObject(schema, rootObj) || {};
+  if (resolved.example !== undefined) return resolved.example;
+  if (resolved.default !== undefined) return resolved.default;
+  if (resolved.enum?.length) return resolved.enum[0];
+  if (resolved.type === 'object' || resolved.properties) {
+    return Object.fromEntries(
+      Object.entries(resolved.properties || {}).map(([name, property]) => [name, exampleForSchema(property, rootObj)])
+    );
   }
-  return paramObj;
+  if (resolved.type === 'array') return [exampleForSchema(resolved.items, rootObj)];
+  if (resolved.type === 'integer' || resolved.type === 'number') return 0;
+  if (resolved.type === 'boolean') return true;
+  return resolved.type ? '' : undefined;
+};
+
+const SchemaDetails: React.FC<SchemaDetailsProps> = ({ schema, root, compact = false }) => {
+  const resolved = resolveObject(schema, root) || {};
+  const required = resolved.required || [];
+  const properties = Object.entries(resolved.properties || {}) as [string, any][];
+  const example = resolved.example !== undefined ? resolved.example : undefined;
+
+  return (
+    <div className={`schema-details ${compact ? 'compact' : ''}`}>
+      {resolved.description && <p className="schema-description">{resolved.description}</p>}
+      <div className="schema-signature">
+        <span className="schema-type">{schemaType(resolved, root)}</span>
+        {resolved.nullable && <span className="schema-flag">nullable</span>}
+      </div>
+      {properties.length > 0 && (
+        <div className="model-properties">
+          {properties.map(([name, property]) => {
+            const propertySchema = resolveObject(property, root) || {};
+            return (
+              <div className="model-property" key={name}>
+                <div className="model-property-head">
+                  <code>{name}</code>
+                  {required.includes(name) && <span className="required-marker">required</span>}
+                  <span className="model-property-type">{schemaType(propertySchema, root)}</span>
+                </div>
+                {propertySchema.description && <p>{propertySchema.description}</p>}
+                <div className="schema-metadata">
+                  {propertySchema.default !== undefined && <span>default: <code>{String(propertySchema.default)}</code></span>}
+                  {propertySchema.enum && <span>enum: <code>{propertySchema.enum.join(', ')}</code></span>}
+                  {propertySchema.example !== undefined && <span>example: <code>{String(propertySchema.example)}</code></span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {example !== undefined && <pre className="example-code">{JSON.stringify(example, null, 2)}</pre>}
+    </div>
+  );
 };
 
 export const ApiDocuments: React.FC<ApiDocumentsProps> = () => {
   const { getToken, token: contextToken } = useAuth();
   const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [activeToken, setActiveToken] = useState<string | null>(contextToken);
-  const [showToken, setShowToken] = useState<boolean>(false);
-
+  const [showToken, setShowToken] = useState(false);
   const [viewMode, setViewMode] = useState<'explorer' | 'schemas' | 'json'>('explorer');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedMethod, setSelectedMethod] = useState<string>('ALL');
-  const [selectedTag, setSelectedTag] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState('ALL');
+  const [selectedTag, setSelectedTag] = useState('ALL');
   const [expandedPath, setExpandedPath] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
 
-  const documentUrl = 'https://ep-divine-union-azkd67d3.apirest.c-3.ap-southeast-1.aws.neon.tech/mibr/rest/v1/openapi.json';
-  const apiBaseUrl = 'https://ep-divine-union-azkd67d3.apirest.c-3.ap-southeast-1.aws.neon.tech/mibr/rest/v1';
-
+  const documentUrl = `${API_HOST}/api/v1/openapi.json`;
   const fetchData = async () => {
     setLoading(true);
     setError(null);
     setStatusMessage(null);
-
     try {
       const token = await getToken();
       setActiveToken(token);
-
-      console.log('[ApiDocuments] Starting fetch to:', documentUrl, '| Token present:', !!token);
-
-      const candidateUrls = [
-        documentUrl,
-        'https://ep-divine-union-azkd67d3.apirest.c-3.ap-southeast-1.aws.neon.tech/mibr/rest/v1/',
-      ];
-
-      let lastError: string | null = null;
-      let lastData: any = null;
-      let success = false;
-
-      for (const targetUrl of candidateUrls) {
-        try {
-          const reqHeaders: Record<string, string> = {
-            'Accept': 'application/openapi+json, application/json, */*',
-          };
-
-          if (token) {
-            reqHeaders['Authorization'] = `Bearer ${token}`;
-          }
-
-          console.log('[ApiDocuments] Executing fetch request to:', targetUrl);
-
-          const response = await fetch(targetUrl, {
-            method: 'GET',
-            headers: reqHeaders,
-          });
-
-          const responseText = await response.text();
-          let parsedData: any;
-          try {
-            parsedData = JSON.parse(responseText);
-          } catch {
-            parsedData = responseText;
-          }
-
-          if (response.ok) {
-            setData(parsedData);
-            setStatusMessage(`Tải dữ liệu API Documents thành công (${response.status} OK)`);
-            success = true;
-            break;
-          } else {
-            const errorMsg =
-              typeof parsedData === 'object' && parsedData?.message
-                ? parsedData.message
-                : `HTTP ${response.status}: ${response.statusText}`;
-
-            lastError = errorMsg;
-            lastData = parsedData;
-
-            if (typeof errorMsg === 'string' && (errorMsg.includes("Could not find the table") || response.status === 404)) {
-              continue;
-            } else {
-              break;
-            }
-          }
-        } catch (fetchErr: any) {
-          console.error('[ApiDocuments] Network fetch error:', fetchErr);
-          lastError = fetchErr?.message || 'Lỗi kết nối';
-        }
+      const response = await fetch(documentUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/openapi+json, application/json, */*',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      const responseText = await response.text();
+      let parsedData: any;
+      try {
+        parsedData = JSON.parse(responseText);
+      } catch {
+        parsedData = responseText;
       }
-
-      if (!success) {
-        setError(lastError || 'Lỗi khi gọi API Documents');
-        if (lastData) setData(lastData);
-      }
+      setData(parsedData);
+      if (response.ok) setStatusMessage(`OpenAPI document loaded (${response.status} OK)`);
+      else setError(typeof parsedData === 'object' && parsedData?.detail ? JSON.stringify(parsedData.detail) : `HTTP ${response.status}: ${response.statusText}`);
     } catch (err: any) {
-      console.error('Error fetching API Documents:', err);
-      setError(err?.message || 'Lỗi kết nối khi gọi API Documents');
+      setError(err?.message || 'Unable to load the OpenAPI document');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -161,564 +164,112 @@ export const ApiDocuments: React.FC<ApiDocumentsProps> = () => {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  // OpenAPI Info Meta
-  const openApiInfo = useMemo(() => {
-    if (data && typeof data === 'object' && !Array.isArray(data)) {
-      return {
-        title: data.info?.title || 'MIBR Neon Database & REST API',
-        version: data.info?.version || 'v1',
-        description: data.info?.description || 'Tài liệu OpenAPI v3 đầy đủ của hệ thống Neon Data API & PostgREST',
-        host: 'ep-divine-union-azkd67d3.apirest.c-3.ap-southeast-1.aws.neon.tech',
-        basePath: '/mibr/rest/v1',
-      };
-    }
-    return {
-      title: 'MIBR REST API',
-      version: 'v1',
-      description: 'Tài liệu API từ endpoint PostgREST',
-      host: 'ep-divine-union-azkd67d3.apirest.c-3.ap-southeast-1.aws.neon.tech',
-      basePath: '/mibr/rest/v1',
-    };
-  }, [data]);
+  const openApiInfo = useMemo(() => ({
+    title: data?.info?.title || 'AI Challenge Search Engine API',
+    version: data?.info?.version || '1.0.0',
+    description: data?.info?.description || 'Chat History & Agent Operations API',
+    openapi: data?.openapi || '3.1.0',
+  }), [data]);
 
-  // Extract endpoints/paths and resolve parameters
+  const serverUrl = data?.servers?.[0]?.url || API_HOST;
+  const serverLabel = serverUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
   const endpointsList = useMemo<EndpointItem[]>(() => {
-    if (!data || typeof data !== 'object') return [];
-
-    if (data.paths && typeof data.paths === 'object') {
-      const list: EndpointItem[] = [];
-
-      Object.entries(data.paths).forEach(([pathKey, pathObj]: [string, any]) => {
-        if (typeof pathObj === 'object' && pathObj !== null) {
-          const methods = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
-          methods.forEach((m) => {
-            if (pathObj[m]) {
-              const details = pathObj[m];
-              const rawParams = details.parameters || [];
-              const resolvedParams = rawParams.map((p: any) => resolveParam(p, data));
-
-              // Tag name based on path e.g. /account -> account
-              const pathTag = pathKey.replace(/^\//, '').split('/')[0] || 'general';
-
-              list.push({
-                path: pathKey,
-                method: m.toUpperCase(),
-                summary: details.summary || details.description || `${m.toUpperCase()} ${pathKey}`,
-                description: details.description || '',
-                parameters: resolvedParams,
-                requestBody: details.requestBody,
-                responses: details.responses || {},
-                tags: details.tags && details.tags.length > 0 ? details.tags : [pathTag],
-              });
-            }
-          });
-        }
+    if (!data?.paths || typeof data.paths !== 'object') return [];
+    const list: EndpointItem[] = [];
+    Object.entries(data.paths).forEach(([path, pathObj]: [string, any]) => {
+      HTTP_METHODS.forEach((method) => {
+        const details = pathObj?.[method];
+        if (!details) return;
+        const operationId = details.operationId || `${method}-${path}`;
+        const pathParams = Array.isArray(pathObj.parameters) ? pathObj.parameters : [];
+        const operationParams = Array.isArray(details.parameters) ? details.parameters : [];
+        const params = [...pathParams, ...operationParams].map((param: any) => resolveObject(param, data));
+        list.push({
+          key: `${method}-${path}-${operationId}`,
+          path,
+          method: method.toUpperCase(),
+          operationId,
+          summary: details.summary || `${method.toUpperCase()} ${path}`,
+          description: details.description || '',
+          parameters: params,
+          requestBody: details.requestBody,
+          responses: details.responses || {},
+          tags: details.tags?.length ? details.tags : ['General'],
+        });
       });
-      return list;
-    }
-
-    return [];
+    });
+    return list;
   }, [data]);
 
-  // Unique tags list for filter
-  const tagsList = useMemo(() => {
-    const tagSet = new Set<string>();
-    endpointsList.forEach((ep) => {
-      if (ep.tags) ep.tags.forEach((t) => tagSet.add(t));
-    });
-    return Array.from(tagSet).sort();
-  }, [endpointsList]);
+  const tagsList = useMemo(() => Array.from(new Set(endpointsList.flatMap((item) => item.tags))).sort(), [endpointsList]);
 
-  // Filtered endpoints
   const filteredEndpoints = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
     return endpointsList.filter((item) => {
       const matchesMethod = selectedMethod === 'ALL' || item.method === selectedMethod;
-      const matchesTag = selectedTag === 'ALL' || (item.tags && item.tags.includes(selectedTag));
-
-      const q = searchQuery.toLowerCase().trim();
-      const matchesQuery =
-        !q ||
-        item.path.toLowerCase().includes(q) ||
-        (item.summary && item.summary.toLowerCase().includes(q)) ||
-        (item.description && item.description.toLowerCase().includes(q)) ||
-        (item.parameters &&
-          item.parameters.some(
-            (p: any) =>
-              (p.name && p.name.toLowerCase().includes(q)) ||
-              (p.description && p.description.toLowerCase().includes(q))
-          ));
-
-      return matchesMethod && matchesTag && matchesQuery;
+      const matchesTag = selectedTag === 'ALL' || item.tags.includes(selectedTag);
+      const searchable = [item.path, item.operationId, item.summary, item.description, ...item.parameters.map((p) => `${p.name} ${p.description || ''}`)].join(' ').toLowerCase();
+      return matchesMethod && matchesTag && (!query || searchable.includes(query));
     });
   }, [endpointsList, selectedMethod, selectedTag, searchQuery]);
 
-  // Extract schemas/definitions
-  const schemasList = useMemo(() => {
-    if (!data || typeof data !== 'object') return {};
-    return data.components?.schemas || data.definitions || {};
-  }, [data]);
+  const endpointGroups = useMemo(() => {
+    const groups = new Map<string, EndpointItem[]>();
+    filteredEndpoints.forEach((endpoint) => endpoint.tags.forEach((tag) => groups.set(tag, [...(groups.get(tag) || []), endpoint])));
+    return Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredEndpoints]);
+
+  const schemasList = useMemo(() => data?.components?.schemas || data?.definitions || {}, [data]);
+
+  const getContent = (content: any) => content?.['application/json'] || Object.values(content || {})[0] as any;
+  const getSchema = (schema: any) => resolveObject(schema, data);
+  const getResponseExample = (response: any) => {
+    const content = getContent(response?.content);
+    if (content?.example !== undefined) return content.example;
+    return exampleForSchema(content?.schema, data);
+  };
 
   return (
     <div className="api-docs-container">
-      {/* Top Bar Header */}
-      <div className="api-docs-header">
-        <div className="api-docs-title-wrap">
-          <div className="api-badge">OPENAPI 3.0</div>
+      <header className="api-docs-header">
+        <div className="api-definition">
+          <span className="api-badge">OAS {openApiInfo.openapi}</span>
           <div>
             <h1 className="api-docs-title">{openApiInfo.title}</h1>
-            <p className="api-docs-subtitle">{documentUrl}</p>
+            <p className="api-docs-subtitle">{openApiInfo.description}</p>
+            <div className="server-line"><span>Server</span><code>{serverLabel}</code><span className="api-version">v{openApiInfo.version}</span></div>
           </div>
         </div>
+        <button className="api-btn secondary" onClick={fetchData} disabled={loading} title="Reload OpenAPI document">
+          <svg className={loading ? 'spin-icon' : ''} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>
+          {loading ? 'Loading...' : 'Refresh'}
+        </button>
+      </header>
 
-        <div className="api-docs-header-actions">
-          <button className="api-btn secondary" onClick={fetchData} disabled={loading} title="Tải lại dữ liệu">
-            <svg
-              className={loading ? 'spin-icon' : ''}
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <polyline points="23 4 23 10 17 10" />
-              <polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-            {loading ? 'Đang tải...' : 'Làm mới'}
-          </button>
-        </div>
-      </div>
-
-      {/* Auth Token Banner */}
       <div className="token-status-banner">
         <div className="token-info">
-          <div className="token-status-indicator">
-            <span className={`status-dot ${activeToken ? 'active' : 'inactive'}`}></span>
-            <span className="status-text">
-              {activeToken ? 'Session Bearer Token Active' : 'Chưa có Session Token'}
-            </span>
-          </div>
-
-          {activeToken && (
-            <div className="token-preview-box">
-              <span className="token-label">Token:</span>
-              <code className="token-code">
-                {showToken ? activeToken : `${activeToken.slice(0, 18)}...${activeToken.slice(-10)}`}
-              </code>
-              <button
-                className="icon-action-btn"
-                onClick={() => setShowToken(!showToken)}
-                title={showToken ? 'Ẩn token' : 'Hiện đầy đủ token'}
-              >
-                {showToken ? '👁️' : '🔒'}
-              </button>
-            </div>
-          )}
+          <div className="token-status-indicator"><span className={`status-dot ${activeToken ? 'active' : 'inactive'}`} /><span className="status-text">{activeToken ? 'Authorized' : 'No authorization token'}</span></div>
+          {activeToken && <div className="token-preview-box"><span className="token-label">Bearer</span><code className="token-code">{showToken ? activeToken : `${activeToken.slice(0, 18)}...${activeToken.slice(-10)}`}</code><button className="icon-action-btn" onClick={() => setShowToken(!showToken)} title={showToken ? 'Hide token' : 'Show token'}>{showToken ? 'Hide' : 'Show'}</button></div>}
         </div>
-
-        {activeToken && (
-          <button
-            className="api-btn sub-btn"
-            onClick={() => handleCopy(`Bearer ${activeToken}`, 'bearer-token')}
-          >
-            {copiedIndex === 'bearer-token' ? '✓ Đã sao chép Bearer Header' : '📋 Copy Bearer Header'}
-          </button>
-        )}
+        {activeToken && <button className="api-btn sub-btn" onClick={() => handleCopy(`Bearer ${activeToken}`, 'bearer-token')}>{copiedIndex === 'bearer-token' ? 'Copied authorization header' : 'Copy authorization header'}</button>}
       </div>
 
-      {/* View Switcher & Search Bar */}
       <div className="api-controls-bar">
         <div className="view-mode-tabs">
-          <button
-            className={`tab-btn ${viewMode === 'explorer' ? 'active' : ''}`}
-            onClick={() => setViewMode('explorer')}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7" />
-              <rect x="14" y="3" width="7" height="7" />
-              <rect x="14" y="14" width="7" height="7" />
-              <rect x="3" y="14" width="7" height="7" />
-            </svg>
-            API Endpoints ({endpointsList.length})
-          </button>
-          <button
-            className={`tab-btn ${viewMode === 'schemas' ? 'active' : ''}`}
-            onClick={() => setViewMode('schemas')}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-            </svg>
-            Database Tables ({Object.keys(schemasList).length})
-          </button>
-          <button
-            className={`tab-btn ${viewMode === 'json' ? 'active' : ''}`}
-            onClick={() => setViewMode('json')}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
-            </svg>
-            Raw OpenAPI JSON
-          </button>
+          <button className={`tab-btn ${viewMode === 'explorer' ? 'active' : ''}`} onClick={() => setViewMode('explorer')}>Operations <span>{endpointsList.length}</span></button>
+          <button className={`tab-btn ${viewMode === 'schemas' ? 'active' : ''}`} onClick={() => setViewMode('schemas')}>Models <span>{Object.keys(schemasList).length}</span></button>
+          <button className={`tab-btn ${viewMode === 'json' ? 'active' : ''}`} onClick={() => setViewMode('json')}>OpenAPI JSON</button>
         </div>
-
-        {viewMode === 'explorer' && (
-          <div className="search-filter-wrap">
-            <div className="search-input-box">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <input
-                type="text"
-                placeholder="Tìm kiếm path, parameter (id, email, select...)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <button className="clear-search" onClick={() => setSearchQuery('')}>
-                  ×
-                </button>
-              )}
-            </div>
-
-            <div className="method-filters">
-              {['ALL', 'GET', 'POST', 'PATCH', 'DELETE'].map((m) => (
-                <button
-                  key={m}
-                  className={`method-filter-chip ${m.toLowerCase()} ${selectedMethod === m ? 'active' : ''}`}
-                  onClick={() => setSelectedMethod(m)}
-                >
-                  {m}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {viewMode === 'explorer' && <div className="search-filter-wrap"><label className="search-input-box"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg><span className="sr-only">Search operations</span><input type="search" placeholder="Filter operations..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} />{searchQuery && <button className="clear-search" onClick={() => setSearchQuery('')} aria-label="Clear search">×</button>}</label><div className="method-filters">{['ALL', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE'].map((method) => <button key={method} className={`method-filter-chip ${method.toLowerCase()} ${selectedMethod === method ? 'active' : ''}`} onClick={() => setSelectedMethod(method)}>{method}</button>)}</div></div>}
       </div>
 
-      {/* Table Filter Chips Bar */}
-      {viewMode === 'explorer' && tagsList.length > 0 && (
-        <div className="table-filter-bar">
-          <span className="filter-label">Filter Table:</span>
-          <button
-            className={`tag-chip ${selectedTag === 'ALL' ? 'active' : ''}`}
-            onClick={() => setSelectedTag('ALL')}
-          >
-            All Tables
-          </button>
-          {tagsList.map((tag) => (
-            <button
-              key={tag}
-              className={`tag-chip ${selectedTag === tag ? 'active' : ''}`}
-              onClick={() => setSelectedTag(tag)}
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
-      )}
+      {viewMode === 'explorer' && tagsList.length > 0 && <div className="tag-filter-bar"><span className="filter-label">Tags</span><button className={`tag-chip ${selectedTag === 'ALL' ? 'active' : ''}`} onClick={() => setSelectedTag('ALL')}>All operations</button>{tagsList.map((tag) => <button key={tag} className={`tag-chip ${selectedTag === tag ? 'active' : ''}`} onClick={() => setSelectedTag(tag)}>{tag}</button>)}</div>}
 
-      {/* Error Alert */}
-      {error && (
-        <div className="api-error-card">
-          <div className="error-icon">⚠️</div>
-          <div className="error-details">
-            <h3>Lỗi truy xuất dữ liệu API</h3>
-            <p>{error}</p>
-            <span className="error-hint">
-              Đảm bảo Bearer Token có quyền truy cập vào endpoint Rest v1 của Neon.
-            </span>
-          </div>
-          <button className="api-btn secondary" onClick={fetchData}>
-            Thử lại
-          </button>
-        </div>
-      )}
+      {error && <div className="api-error-card"><div className="error-icon">!</div><div className="error-details"><h3>Unable to load API definition</h3><p>{error}</p><span className="error-hint">The API accepts a Bearer token or an explicit user_id for chat history access.</span></div><button className="api-btn secondary" onClick={fetchData}>Try again</button></div>}
+      {statusMessage && !error && <div className="api-status-card">{statusMessage}</div>}
 
-      {/* Status Card */}
-      {statusMessage && !error && (
-        <div className="api-status-card">
-          <span>{statusMessage}</span>
-        </div>
-      )}
-
-      {/* Main Content Body */}
-      {loading ? (
-        <div className="api-loading-state">
-          <div className="spinner"></div>
-          <p>Đang tải tài liệu OpenAPI v3 với Bearer Token...</p>
-        </div>
-      ) : viewMode === 'json' ? (
-        <div className="json-view-container">
-          <div className="json-header">
-            <span>Raw OpenAPI JSON Output</span>
-            <button
-              className="api-btn sub-btn"
-              onClick={() => handleCopy(JSON.stringify(data, null, 2), 'raw-json')}
-            >
-              {copiedIndex === 'raw-json' ? '✓ Copied' : '📋 Copy JSON'}
-            </button>
-          </div>
-          <pre className="json-code-block">{JSON.stringify(data, null, 2)}</pre>
-        </div>
-      ) : viewMode === 'schemas' ? (
-        <div className="schemas-view-container">
-          <div className="section-header">
-            <h2>Database Models & Schemas ({Object.keys(schemasList).length})</h2>
-            <p className="section-desc">Cấu trúc chi tiết các bảng trong cơ sở dữ liệu PostgreSQL của Neon.</p>
-          </div>
-
-          <div className="schemas-grid">
-            {Object.entries(schemasList).map(([schemaName, schemaObj]: [string, any]) => {
-              const properties = schemaObj.properties || {};
-              const requiredFields = schemaObj.required || [];
-
-              return (
-                <div key={schemaName} className="schema-card">
-                  <div className="schema-header">
-                    <span className="schema-title">{schemaName}</span>
-                    <span className="schema-type-badge">{schemaObj.type || 'object'}</span>
-                  </div>
-
-                  <div className="schema-props-table-wrap">
-                    <table className="params-table">
-                      <thead>
-                        <tr>
-                          <th>Column</th>
-                          <th>Type / Format</th>
-                          <th>Key / Constraint</th>
-                          <th>Default Value</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(properties).map(([propName, propDetails]: [string, any]) => {
-                          const isRequired = requiredFields.includes(propName);
-                          const desc = propDetails.description || '';
-                          const isPK = desc.includes('Primary Key');
-                          const isFK = desc.includes('Foreign Key');
-
-                          return (
-                            <tr key={propName}>
-                              <td className="param-name">
-                                {propName}
-                                {isRequired && <span className="req-yes" title="Required">*</span>}
-                              </td>
-                              <td>
-                                <code>{propDetails.type || 'string'}</code>
-                                {propDetails.format && <span className="format-tag"> ({propDetails.format})</span>}
-                              </td>
-                              <td>
-                                {isPK && <span className="key-badge pk">🔑 Primary Key</span>}
-                                {isFK && <span className="key-badge fk">🔗 Foreign Key</span>}
-                                {!isPK && !isFK && <span className="key-badge norm">Column</span>}
-                              </td>
-                              <td className="param-desc">
-                                {propDetails.default ? <code>{propDetails.default}</code> : '-'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        <div className="explorer-view-container">
-          {/* API Meta Summary Card */}
-          <div className="api-meta-card">
-            <div className="meta-row">
-              <span className="meta-title">{openApiInfo.title}</span>
-              <span className="meta-version">OpenAPI {data?.openapi || '3.0.0'}</span>
-            </div>
-            <p className="meta-description">{openApiInfo.description}</p>
-            <div className="meta-tags">
-              <span className="meta-chip">Host: {openApiInfo.host}</span>
-              <span className="meta-chip">Base Path: {openApiInfo.basePath}</span>
-              <span className="meta-chip">Total Endpoints: {endpointsList.length}</span>
-              <span className="meta-chip">Tables: {Object.keys(schemasList).length}</span>
-            </div>
-          </div>
-
-          {/* Endpoints Section */}
-          <div className="endpoints-section">
-            <div className="section-header">
-              <h2>Endpoints ({filteredEndpoints.length})</h2>
-            </div>
-
-            {filteredEndpoints.length === 0 ? (
-              <div className="empty-endpoints">
-                <p>Không tìm thấy endpoint nào phù hợp với bộ lọc.</p>
-              </div>
-            ) : (
-              <div className="endpoint-list">
-                {filteredEndpoints.map((ep, idx) => {
-                  const epKey = `${ep.method}-${ep.path}-${idx}`;
-                  const isExpanded = expandedPath === epKey;
-                  const curlCommand = `curl -X ${ep.method} "${apiBaseUrl}${ep.path.startsWith('/') ? '' : '/'}${ep.path}" \\\n  -H "Authorization: Bearer ${activeToken || '<YOUR_TOKEN>'}" \\\n  -H "Accept: application/json"`;
-
-                  // Resolve requestBody schema if present
-                  let requestBodySchemaName = '';
-                  let requestBodySchemaObj: any = null;
-                  if (ep.requestBody?.content) {
-                    const contentObj = ep.requestBody.content;
-                    const jsonContent = contentObj['application/json; charset=utf-8'] || contentObj['application/json'];
-                    if (jsonContent?.schema) {
-                      if (jsonContent.schema.$ref) {
-                        requestBodySchemaName = jsonContent.schema.$ref.split('/').pop() || '';
-                        requestBodySchemaObj = resolveRef(jsonContent.schema.$ref, data);
-                      } else if (jsonContent.schema.properties) {
-                        requestBodySchemaName = 'Payload Object';
-                        requestBodySchemaObj = jsonContent.schema;
-                      }
-                    }
-                  }
-
-                  return (
-                    <div
-                      key={epKey}
-                      className={`endpoint-card ${ep.method.toLowerCase()} ${isExpanded ? 'expanded' : ''}`}
-                    >
-                      <div
-                        className="endpoint-header-row"
-                        onClick={() => setExpandedPath(isExpanded ? null : epKey)}
-                      >
-                        <span className={`method-badge ${ep.method.toLowerCase()}`}>{ep.method}</span>
-                        <span className="endpoint-path">{ep.path}</span>
-                        {ep.tags && ep.tags[0] && (
-                          <span className="endpoint-tag-pill">{ep.tags[0]}</span>
-                        )}
-                        <span className="endpoint-summary">{ep.summary}</span>
-                        <span className="expand-icon">{isExpanded ? '▲' : '▼'}</span>
-                      </div>
-
-                      {isExpanded && (
-                        <div className="endpoint-body">
-                          {ep.description && <p className="ep-desc">{ep.description}</p>}
-
-                          {/* Parameters Table (Fully Resolved) */}
-                          <div className="ep-subsection">
-                            <div className="subsection-header-row">
-                              <h4>Parameters ({ep.parameters ? ep.parameters.length : 0})</h4>
-                              <span className="param-count-hint">Query, Header & Path filters</span>
-                            </div>
-
-                            {ep.parameters && ep.parameters.length > 0 ? (
-                              <div className="params-table-wrap">
-                                <table className="params-table">
-                                  <thead>
-                                    <tr>
-                                      <th>Parameter Name</th>
-                                      <th>In</th>
-                                      <th>Type</th>
-                                      <th>Required</th>
-                                      <th>Description / Details</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {ep.parameters.map((param: any, pIdx: number) => {
-                                      const paramName = param.name || (param.refPath ? param.refPath.split('/').pop() : `param-${pIdx}`);
-                                      const paramIn = param.in || 'query';
-                                      const paramType = param.schema?.type || param.type || 'string';
-                                      const paramDefault = param.schema?.default !== undefined ? param.schema.default : param.default;
-                                      const paramDesc = param.description || (param.schema?.description ? param.schema.description : '-');
-
-                                      return (
-                                        <tr key={pIdx}>
-                                          <td className="param-name">
-                                            <code>{paramName}</code>
-                                          </td>
-                                          <td>
-                                            <span className={`in-badge ${paramIn}`}>{paramIn}</span>
-                                          </td>
-                                          <td>
-                                            <code className="type-code">{paramType}</code>
-                                          </td>
-                                          <td>
-                                            {param.required ? (
-                                              <span className="req-yes">Required</span>
-                                            ) : (
-                                              <span className="req-no">Optional</span>
-                                            )}
-                                          </td>
-                                          <td className="param-desc">
-                                            <div>{paramDesc}</div>
-                                            {paramDefault !== undefined && (
-                                              <div className="param-default">
-                                                Default: <code>{String(paramDefault)}</code>
-                                              </div>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            ) : (
-                              <p className="no-params-text">No parameters specified for this operation.</p>
-                            )}
-                          </div>
-
-                          {/* Request Body Schema if present */}
-                          {requestBodySchemaObj && (
-                            <div className="ep-subsection">
-                              <h4>Request Body Payload ({requestBodySchemaName})</h4>
-                              <div className="req-body-box">
-                                <span className="req-body-label">Schema model: <code>{requestBodySchemaName}</code></span>
-                                <pre className="json-code-block payload">
-                                  {JSON.stringify(requestBodySchemaObj.properties || requestBodySchemaObj, null, 2)}
-                                </pre>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Pre-formatted cURL Code Block */}
-                          <div className="ep-subsection">
-                            <div className="curl-header">
-                              <h4>Sample cURL Request</h4>
-                              <button
-                                className="api-btn sub-btn"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCopy(curlCommand, epKey);
-                                }}
-                              >
-                                {copiedIndex === epKey ? '✓ Copied cURL' : '📋 Copy cURL'}
-                              </button>
-                            </div>
-                            <pre className="curl-code-block">{curlCommand}</pre>
-                          </div>
-
-                          {/* Responses */}
-                          {ep.responses && Object.keys(ep.responses).length > 0 && (
-                            <div className="ep-subsection">
-                              <h4>Responses</h4>
-                              <div className="responses-list">
-                                {Object.entries(ep.responses).map(([code, resp]: [string, any]) => (
-                                  <div key={code} className="response-row">
-                                    <span className={`status-badge s-${code.slice(0, 1)}xx`}>{code}</span>
-                                    <span className="resp-desc">{resp.description || 'Response'}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {loading ? <div className="api-loading-state"><div className="spinner" /><p>Loading OpenAPI definition...</p></div> : viewMode === 'json' ? <div className="json-view-container"><div className="json-header"><span>Raw OpenAPI definition</span><button className="api-btn sub-btn" onClick={() => handleCopy(JSON.stringify(data, null, 2), 'raw-json')}>{copiedIndex === 'raw-json' ? 'Copied' : 'Copy JSON'}</button></div><pre className="json-code-block">{JSON.stringify(data, null, 2)}</pre></div> : viewMode === 'schemas' ? <div className="schemas-view-container"><div className="section-header"><h2>Models</h2><p className="section-desc">Reusable request and response schemas defined by this API.</p></div><div className="models-list">{Object.entries(schemasList).map(([schemaName, schema]) => <details className="model-card" key={schemaName}><summary><code>{schemaName}</code><span>{schemaType(schema, data)}</span></summary><SchemaDetails schema={schema} root={data} /></details>)}</div>{Object.keys(schemasList).length === 0 && <div className="empty-endpoints">No reusable models are defined in this document.</div>}</div> : <div className="explorer-view-container"><div className="api-meta-card"><div className="meta-row"><span className="meta-title">{openApiInfo.title}</span><span className="meta-version">OpenAPI {openApiInfo.openapi}</span></div><p className="meta-description">{openApiInfo.description}</p><div className="meta-tags"><span className="meta-chip">Server: {serverLabel}</span><span className="meta-chip">Operations: {endpointsList.length}</span><span className="meta-chip">Tags: {tagsList.length}</span></div></div><div className="endpoints-section"><div className="section-header"><h2>Operations <span className="result-count">{filteredEndpoints.length} of {endpointsList.length}</span></h2></div>{filteredEndpoints.length === 0 ? <div className="empty-endpoints">No operations match the current filters.</div> : <div className="endpoint-groups">{endpointGroups.map(([tag, endpoints]) => <section className="endpoint-group" key={tag}><div className="tag-heading"><div><h3>{tag}</h3>{data?.tags?.find((item: any) => item.name === tag)?.description && <p>{data.tags.find((item: any) => item.name === tag).description}</p>}</div><span>{endpoints.length} operation{endpoints.length === 1 ? '' : 's'}</span></div><div className="endpoint-list">{endpoints.map((endpoint) => { const isExpanded = expandedPath === endpoint.key; const curlCommand = `curl -X ${endpoint.method} "${serverUrl}${endpoint.path}" \\\n  -H "Authorization: Bearer ${activeToken || '<YOUR_TOKEN>'}" \\\n  -H "Accept: application/json"`; return <article className={`endpoint-card ${endpoint.method.toLowerCase()} ${isExpanded ? 'expanded' : ''}`} key={endpoint.key}><button className="endpoint-header-row" onClick={() => setExpandedPath(isExpanded ? null : endpoint.key)} aria-expanded={isExpanded}><span className={`method-badge ${endpoint.method.toLowerCase()}`}>{endpoint.method}</span><span className="endpoint-path">{endpoint.path}</span><span className="endpoint-summary">{endpoint.summary}</span><span className="expand-icon">{isExpanded ? '−' : '+'}</span></button>{isExpanded && <div className="endpoint-body">{endpoint.operationId && <div className="operation-id">{endpoint.operationId}</div>}{endpoint.description && <p className="ep-desc">{endpoint.description}</p>}<div className="ep-subsection"><div className="subsection-header-row"><h4>Parameters</h4><span className="param-count-hint">{endpoint.parameters.length} parameter{endpoint.parameters.length === 1 ? '' : 's'}</span></div>{endpoint.parameters.length > 0 ? <div className="params-table-wrap"><table className="params-table"><thead><tr><th>Name</th><th>In</th><th>Schema</th><th>Description</th></tr></thead><tbody>{endpoint.parameters.map((param: any, index) => <tr key={`${param.name || 'parameter'}-${index}`}><td className="param-name"><code>{param.name || `parameter-${index}`}</code>{param.required && <span className="required-marker">required</span>}</td><td><span className={`in-badge ${param.in || 'query'}`}>{param.in || 'query'}</span></td><td><code className="type-code">{schemaType(param.schema || param, data)}</code>{param.schema?.nullable && <span className="schema-flag">nullable</span>}</td><td className="param-desc">{param.description || param.schema?.description || '—'}{param.schema?.default !== undefined && <div className="param-default">default: <code>{String(param.schema.default)}</code></div>}{param.schema?.enum && <div className="param-default">enum: <code>{param.schema.enum.join(', ')}</code></div>}</td></tr>)}</tbody></table></div> : <p className="no-params-text">No parameters</p>}</div>{endpoint.requestBody && <div className="ep-subsection"><h4>Request body {endpoint.requestBody.required && <span className="required-marker">required</span>}</h4>{Object.entries(endpoint.requestBody.content || {}).map(([contentType, media]: [string, any]) => { const bodySchema = getSchema(media.schema); const example = media.example ?? (media.examples ? Object.values(media.examples)[0] as any : undefined); return <div className="contract-box" key={contentType}><div className="contract-heading"><span>{contentType}</span><code>{schemaType(bodySchema, data)}</code></div><SchemaDetails schema={bodySchema} root={data} compact />{example !== undefined && <pre className="example-code">{JSON.stringify(example, null, 2)}</pre>}</div>; })}</div>}{<div className="ep-subsection"><h4>Responses</h4><div className="responses-list">{Object.entries(endpoint.responses).map(([code, response]: [string, any]) => { const resolvedResponse = resolveObject(response, data) || {}; const content = getContent(resolvedResponse.content); const responseSchema = getSchema(content?.schema); const responseExample = getResponseExample(resolvedResponse); return <div className="response-row" key={code}><div className={`status-badge s-${code.slice(0, 1)}xx`}>{code}</div><div className="response-content"><strong>{resolvedResponse.description || 'Response'}</strong>{content && <div className="response-contract"><span>{Object.keys(resolvedResponse.content || {})[0] || 'application/json'}</span><code>{schemaType(responseSchema, data)}</code></div>}{responseExample !== undefined && <pre className="example-code">{JSON.stringify(responseExample, null, 2)}</pre>}</div></div>; })}</div></div>}<div className="ep-subsection"><div className="curl-header"><h4>Request sample</h4><button className="api-btn sub-btn" onClick={(event) => { event.stopPropagation(); handleCopy(curlCommand, endpoint.key); }}>{copiedIndex === endpoint.key ? 'Copied cURL' : 'Copy cURL'}</button></div><pre className="curl-code-block">{curlCommand}</pre></div></div>}</article>; })}</div></section>)}</div>}</div></div>}
     </div>
   );
 };

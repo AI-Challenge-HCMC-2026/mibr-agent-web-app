@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './FormattedMessage.css';
@@ -88,9 +89,80 @@ const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, cod
   );
 };
 
+// ─── Lightbox Image Component ────────────────────────────────────────────────
+
+const LightboxImage: React.FC<{
+  src?: string;
+  alt?: string;
+  onOpen: (src: string, alt: string) => void;
+}> = ({ src, alt, onOpen }) => {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  if (failed || !src) return null;
+
+  return (
+    <figure
+      className="md-image-figure"
+      onClick={() => onOpen(src, alt || '')}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onOpen(src, alt || '');
+        }
+      }}
+    >
+      <img
+        className={`md-image${loaded ? ' md-image--loaded' : ''}`}
+        src={src}
+        alt={alt || ''}
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+      {!loaded && <div className="md-image-skeleton" />}
+      {loaded && (
+        <div className="md-image-overlay">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 3 21 3 21 9" />
+            <polyline points="9 21 3 21 3 15" />
+            <line x1="21" y1="3" x2="14" y2="10" />
+            <line x1="3" y1="21" x2="10" y2="14" />
+          </svg>
+        </div>
+      )}
+      {alt && <figcaption className="md-image-caption">{alt}</figcaption>}
+    </figure>
+  );
+};
+
 // ─── Main FormattedMessage Component ─────────────────────────────────────────
 
 export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) => {
+  const [lightbox, setLightbox] = useState<{ src: string; alt: string } | null>(null);
+
+  const openLightbox = useCallback((src: string, alt: string) => {
+    setLightbox({ src, alt });
+  }, []);
+
+  const closeLightbox = useCallback(() => {
+    setLightbox(null);
+  }, []);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+    };
+    document.addEventListener('keydown', handleKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+    };
+  }, [lightbox, closeLightbox]);
+
   if (!content) return null;
 
   return (
@@ -134,8 +206,6 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
           a: ({ href, children }) => {
             const url = href || '';
             const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
-            // GFM autolinks bare URLs: the visible text equals the href. Those
-            // are the ones that render ugly in tables, so we shorten them.
             const childText = React.Children.toArray(children).join('');
             const isBareUrl = childText === url;
 
@@ -175,11 +245,14 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
             );
           },
 
+          // Images — click to open lightbox
+          img: ({ src, alt }) => (
+            <LightboxImage src={src} alt={alt} onOpen={openLightbox} />
+          ),
+
           // Inline Code & Code Blocks
           code: ({ className, children, ...props }) => {
             const match = /language-(\w+)/.exec(className || '');
-            // react-markdown v9: block code is inside <pre><code>, inline has no parent pre
-            // We detect block code via the presence of a language class
             const isBlock = Boolean(match);
             const codeString = String(children).replace(/\n$/, '');
 
@@ -212,6 +285,34 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
       >
         {content}
       </ReactMarkdown>
+
+      {/* Lightbox overlay */}
+      {lightbox &&
+        createPortal(
+          <div className="md-lightbox" onClick={closeLightbox}>
+            <button
+              className="md-lightbox-close"
+              onClick={closeLightbox}
+              aria-label="Close image"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+            <div className="md-lightbox-content" onClick={(e) => e.stopPropagation()}>
+              <img
+                className="md-lightbox-img"
+                src={lightbox.src}
+                alt={lightbox.alt}
+              />
+              {lightbox.alt && (
+                <div className="md-lightbox-caption">{lightbox.alt}</div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
