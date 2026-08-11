@@ -686,6 +686,36 @@
   position: relative;
 }
 
+.page-chat-wrapper .context-meter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  cursor: default;
+}
+
+.page-chat-wrapper .context-ring-bg {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+
+.page-chat-wrapper .context-ring-fill {
+  stroke: var(--accent, #6c8cff);
+  transition: stroke-dasharray 0.3s ease, stroke 0.3s ease;
+}
+
+.page-chat-wrapper .context-ring-fill.warn {
+  stroke: #e0a63a;
+}
+
+.page-chat-wrapper .context-ring-fill.danger {
+  stroke: #e0533a;
+}
+
+.page-chat-wrapper .context-meter-label {
+  font-variant-numeric: tabular-nums;
+}
+
 .page-chat-wrapper .model-pill {
   display: flex;
   align-items: center;

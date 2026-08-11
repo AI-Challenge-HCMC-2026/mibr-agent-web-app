@@ -88,6 +88,18 @@ MCP giúp việc tích hợp các công cụ bên ngoài trở nên cắm-là-ch
   },
 ];
 
+const DEFAULT_CONTEXT_LIMIT = 256_000;
+const GEMMA_CONTEXT_LIMIT = 16_000;
+
+const getContextLimit = (modelKey?: string) =>
+  modelKey && modelKey.startsWith('gemma-') ? GEMMA_CONTEXT_LIMIT : DEFAULT_CONTEXT_LIMIT;
+
+// Rough token estimate: ~4 characters per token.
+const estimateTokens = (messages: { content: string; reasoning?: string }[]) =>
+  Math.ceil(
+    messages.reduce((sum, m) => sum + (m.content?.length || 0) + (m.reasoning?.length || 0), 0) / 4
+  );
+
 const formatModelLabel = (modelKey?: string) => {
   if (!modelKey) return 'Gemini 3.5 Flash Lite';
   const labels: Record<string, string> = {
@@ -402,6 +414,9 @@ export const Chat: React.FC = () => {
   };
 
   const currentModelLabel = formatModelLabel(selectedModel);
+  const contextLimit = getContextLimit(selectedModel);
+  const usedTokens = estimateTokens(activeSession?.messages || []);
+  const contextPercent = Math.min(100, (usedTokens / contextLimit) * 100);
 
   return (
     <ChatLayout
@@ -564,6 +579,33 @@ export const Chat: React.FC = () => {
               </svg>
             </button>
             <div className="right-controls">
+              <div
+                className="context-meter"
+                title={`Context: ${usedTokens.toLocaleString()} / ${contextLimit.toLocaleString()} tokens (${Math.round(contextPercent)}%)`}
+              >
+                <svg width="14" height="14" viewBox="0 0 36 36" className="context-ring">
+                  <circle
+                    className="context-ring-bg"
+                    cx="18"
+                    cy="18"
+                    r="15.5"
+                    fill="none"
+                    strokeWidth="4"
+                  />
+                  <circle
+                    className={`context-ring-fill${contextPercent >= 90 ? ' danger' : contextPercent >= 70 ? ' warn' : ''}`}
+                    cx="18"
+                    cy="18"
+                    r="15.5"
+                    fill="none"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeDasharray={`${(contextPercent / 100) * 2 * Math.PI * 15.5} ${2 * Math.PI * 15.5}`}
+                    transform="rotate(-90 18 18)"
+                  />
+                </svg>
+                <span className="context-meter-label">{Math.round(contextPercent)}%</span>
+              </div>
               <div className="model-selector" ref={modelMenuRef}>
                 {showModelMenu && (
                   <div className="model-menu">
