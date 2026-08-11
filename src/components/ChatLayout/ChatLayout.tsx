@@ -7,6 +7,8 @@ export interface ChatSession {
   id: string;
   title: string;
   messages: any[];
+  /** Server-reported token usage from the latest Gemini turn. */
+  tokenCount?: number;
 }
 
 interface ChatLayoutProps {

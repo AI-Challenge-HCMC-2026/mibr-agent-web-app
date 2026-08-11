@@ -38,6 +38,7 @@ export interface GeminiChatResponse {
   reasoningText?: string;
   rateLimited?: boolean;
   retryAfterSeconds?: number;
+  totalTokenCount?: number;
 }
 
 // Extracts rate-limit info from a Gemini 429 (RESOURCE_EXHAUSTED) error.
@@ -236,6 +237,14 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
     };
 
     let accumulatedText = '';
+    let totalTokenCount: number | undefined;
+
+    // usageMetadata arrives on stream chunks (cumulative); the last one that
+    // carries it is authoritative for the turn.
+    const collectUsage = (chunkObj: any) => {
+      const total = chunkObj?.usageMetadata?.totalTokenCount;
+      if (typeof total === 'number') totalTokenCount = total;
+    };
 
     // Function calls can be split across streaming chunks — the last chunk is
     // NOT guaranteed to carry them. Collect them from every chunk so a trailing
@@ -278,6 +287,7 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
         for await (const chunk of stream) {
           lastChunk = chunk;
           collectReasoning(chunk);
+          collectUsage(chunk);
           streamedFunctionCalls.push(...collectFunctionCalls(chunk));
           const cText = getChunkText(chunk);
           if (cText) {
@@ -296,6 +306,7 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
           const singleRes = await chat.sendMessage(sendParam as any);
           lastChunk = singleRes;
           collectReasoning(singleRes);
+          collectUsage(singleRes);
           streamedFunctionCalls.push(...collectFunctionCalls(singleRes));
           const sText = getChunkText(singleRes);
           if (sText) {
@@ -393,6 +404,7 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
         text: finalText,
         toolCalls: executedToolCalls,
         reasoningText: extractedReasoning || undefined,
+        totalTokenCount,
       };
     }
 

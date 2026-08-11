@@ -313,6 +313,7 @@ export const Chat: React.FC = () => {
       const responseText = typeof result === 'string' ? result : result.text;
       const toolCalls = typeof result === 'string' ? [] : result.toolCalls;
       const reasoningText = typeof result === 'string' ? undefined : result.reasoningText;
+      const totalTokenCount = typeof result === 'string' ? undefined : result.totalTokenCount;
 
       if (typeof result !== 'string' && result.rateLimited) {
         setRateLimitSeconds(result.retryAfterSeconds || 30);
@@ -322,6 +323,8 @@ export const Chat: React.FC = () => {
           if (session.id === activeSessionId) {
             return {
               ...session,
+              tokenCount:
+                typeof totalTokenCount === 'number' ? totalTokenCount : session.tokenCount,
               messages: session.messages.map((m) => {
                 if (m.id === botMsgId) {
                   const trimmedResponse =
@@ -415,7 +418,10 @@ export const Chat: React.FC = () => {
 
   const currentModelLabel = formatModelLabel(selectedModel);
   const contextLimit = getContextLimit(selectedModel);
-  const usedTokens = estimateTokens(activeSession?.messages || []);
+  const hasServerTokenCount = typeof activeSession?.tokenCount === 'number';
+  const usedTokens = hasServerTokenCount
+    ? activeSession!.tokenCount!
+    : estimateTokens(activeSession?.messages || []);
   const contextPercent = Math.min(100, (usedTokens / contextLimit) * 100);
 
   return (
@@ -581,7 +587,7 @@ export const Chat: React.FC = () => {
             <div className="right-controls">
               <div
                 className="context-meter"
-                title={`Context: ${usedTokens.toLocaleString()} / ${contextLimit.toLocaleString()} tokens (${Math.round(contextPercent)}%)`}
+                title={`Context: ${usedTokens.toLocaleString()} / ${contextLimit.toLocaleString()} tokens (${Math.round(contextPercent)}%)${hasServerTokenCount ? '' : ' — ước lượng'}`}
               >
                 <svg width="14" height="14" viewBox="0 0 36 36" className="context-ring">
                   <circle
