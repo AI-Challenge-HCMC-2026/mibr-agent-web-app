@@ -20,7 +20,8 @@ export interface McpToolCallResult {
   [key: string]: any;
 }
 
-export const DEFAULT_MCP_SERVER_URL = 'https://opossum-excuse-spinning.ngrok-free.dev/mcp/';
+export const DEFAULT_MCP_SERVER_URL =
+  (import.meta.env.VITE_MCP_SERVER_URL as string | undefined) || '';
 
 /**
  * Clean up JSON schema to fit Google Gemini API functionDeclarations format

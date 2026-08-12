@@ -76,7 +76,6 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
                 provider: config.provider || 'gemini',
                 apikey: config.apikey || '',
                 model: parsed.model || 'gemini-3.5-flash-lite',
-                mcpServerUrl: parsed.mcpServerUrl || 'https://opossum-excuse-spinning.ngrok-free.dev/mcp/',
                 enableMcp: parsed.enableMcp !== undefined ? Boolean(parsed.enableMcp) : true,
                 enableReasoning: parsed.enableReasoning !== undefined ? Boolean(parsed.enableReasoning) : true,
               })

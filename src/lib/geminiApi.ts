@@ -24,7 +24,6 @@ export interface SendGeminiChatOptions {
   newMessageText: string;
   overrideApiKey?: string;
   userToken?: string | null;
-  mcpServerUrl?: string;
   enableMcp?: boolean;
   onChunk?: (accumulatedText: string, chunkText: string) => void;
   onReasoningChunk?: (accumulatedReasoning: string) => void;
@@ -82,7 +81,6 @@ export async function sendGeminiChatMessage(
   let newMessageText = '';
   let overrideApiKey: string | undefined;
   let userToken: string | null | undefined;
-  let mcpServerUrl = DEFAULT_MCP_SERVER_URL;
   let enableMcp = true;
   let onChunk: ((accumulatedText: string, chunkText: string) => void) | undefined;
   let onReasoningChunk: ((accumulatedReasoning: string) => void) | undefined;
@@ -100,7 +98,6 @@ export async function sendGeminiChatMessage(
     newMessageText = optionsOrHistory.newMessageText || '';
     overrideApiKey = optionsOrHistory.overrideApiKey;
     userToken = optionsOrHistory.userToken;
-    mcpServerUrl = optionsOrHistory.mcpServerUrl || DEFAULT_MCP_SERVER_URL;
     enableMcp = optionsOrHistory.enableMcp ?? true;
     onChunk = optionsOrHistory.onChunk;
     onReasoningChunk = optionsOrHistory.onReasoningChunk;
@@ -121,7 +118,7 @@ export async function sendGeminiChatMessage(
     return isOptionsObject ? { text: errorMsg, toolCalls: [] } : errorMsg;
   }
 
-  const mcpUrlToUse = userSettings?.mcpServerUrl?.trim() || mcpServerUrl || DEFAULT_MCP_SERVER_URL;
+  const mcpUrlToUse = DEFAULT_MCP_SERVER_URL;
   const mcpEnabled = userSettings?.enableMcp !== undefined ? userSettings.enableMcp : enableMcp;
 
   let selectedModel = (userSettings?.model || '').trim();

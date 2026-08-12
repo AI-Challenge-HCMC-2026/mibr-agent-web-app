@@ -6,9 +6,14 @@
  * Xác thực bằng Supabase JWT (Bearer token).
  */
 
-export const CHAT_HISTORY_API_HOST = 'https://upstbmubljmmuqoslmoj.supabase.co';
-export const CHAT_HISTORY_API_BASE = `${CHAT_HISTORY_API_HOST}/functions/v1/chat-api`;
+const CHAT_HISTORY_API_HOST =
+  (import.meta.env.VITE_SUPABASE_URL as string | undefined) || '';
+export const CHAT_HISTORY_API_BASE = CHAT_HISTORY_API_HOST
+  ? `${CHAT_HISTORY_API_HOST.replace(/\/$/, '')}/functions/v1/chat-api`
+  : '';
 export const CHAT_HISTORY_OPENAPI_URL = '';
+
+export const getChatHistoryApiHost = (): string => CHAT_HISTORY_API_HOST;
 
 export interface ChatSessionDto {
   session_id: string;

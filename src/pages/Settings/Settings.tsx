@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabaseRestBaseUrl } from '../../lib/authClient';
-import { DEFAULT_MCP_SERVER_URL } from '../../lib/mcpClient';
 import './Settings.css';
 
 export interface UserSettingsData {
   provider: string;
   apikey: string;
   model: string;
-  mcpServerUrl?: string;
   enableMcp?: boolean;
   enableReasoning?: boolean;
 }
@@ -54,7 +52,6 @@ export const SettingsContent: React.FC = () => {
   const { user, getToken } = useAuth();
   const [apikey, setApikey] = useState<string>('');
   const [model, setModel] = useState<string>('gemini-3.5-flash-lite');
-  const [mcpServerUrl, setMcpServerUrl] = useState<string>(DEFAULT_MCP_SERVER_URL);
   const [enableMcp, setEnableMcp] = useState<boolean>(true);
   const [enableReasoning, setEnableReasoning] = useState<boolean>(true);
 
@@ -73,7 +70,6 @@ export const SettingsContent: React.FC = () => {
       if (stored) {
         if (stored.apikey) setApikey(stored.apikey);
         if (stored.model) setModel(stored.model);
-        if (stored.mcpServerUrl) setMcpServerUrl(stored.mcpServerUrl);
         if (stored.enableMcp !== undefined) setEnableMcp(stored.enableMcp);
         if (stored.enableReasoning !== undefined) setEnableReasoning(stored.enableReasoning);
       }
@@ -115,12 +111,10 @@ export const SettingsContent: React.FC = () => {
                   ? parsedSettings.model
                   : 'gemini-3.5-flash-lite';
 
-              const loadedMcpUrl = parsedSettings.mcpServerUrl || DEFAULT_MCP_SERVER_URL;
               const loadedEnableMcp = parsedSettings.enableMcp !== undefined ? Boolean(parsedSettings.enableMcp) : true;
               const loadedEnableReasoning = parsedSettings.enableReasoning !== undefined ? Boolean(parsedSettings.enableReasoning) : true;
 
               setModel(loadedModel);
-              setMcpServerUrl(loadedMcpUrl);
               setEnableMcp(loadedEnableMcp);
               setEnableReasoning(loadedEnableReasoning);
 
@@ -130,7 +124,6 @@ export const SettingsContent: React.FC = () => {
                   provider: 'gemini',
                   apikey: userConfig.apikey || '',
                   model: loadedModel,
-                  mcpServerUrl: loadedMcpUrl,
                   enableMcp: loadedEnableMcp,
                   enableReasoning: loadedEnableReasoning,
                 })
@@ -163,7 +156,6 @@ export const SettingsContent: React.FC = () => {
         p_apikey: apikey.trim(),
         p_settings: {
           model: model,
-          mcpServerUrl: mcpServerUrl.trim() || DEFAULT_MCP_SERVER_URL,
           enableMcp: enableMcp,
           enableReasoning: enableReasoning,
         },
@@ -186,7 +178,6 @@ export const SettingsContent: React.FC = () => {
             provider: 'gemini',
             apikey: apikey.trim(),
             model,
-            mcpServerUrl: mcpServerUrl.trim() || DEFAULT_MCP_SERVER_URL,
             enableMcp,
             enableReasoning,
           })
@@ -328,18 +319,6 @@ export const SettingsContent: React.FC = () => {
               </div>
 
               <div className="section-body">
-                <div className="form-group">
-                  <label htmlFor="mcpurl">Địa chỉ máy chủ MCP</label>
-                  <input
-                    id="mcpurl"
-                    type="text"
-                    className="form-control"
-                    placeholder={DEFAULT_MCP_SERVER_URL}
-                    value={mcpServerUrl}
-                    onChange={(e) => setMcpServerUrl(e.target.value)}
-                  />
-                </div>
-
                 <div className="toggle-switch-row">
                   <div className="toggle-info">
                     <span className="toggle-title">Bật MCP Tools</span>

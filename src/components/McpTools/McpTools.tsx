@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMcpTools, DEFAULT_MCP_SERVER_URL, type McpTool } from '../../lib/mcpClient';
-import { getStoredUserSettings } from '../../pages/Settings/Settings';
 import './McpTools.css';
 
 interface McpToolsProps {
@@ -21,13 +20,11 @@ export const McpTools: React.FC<McpToolsProps> = ({ onSelectTool, onNavigateToSe
     setLoading(true);
     setError(null);
 
-    const savedSettings = getStoredUserSettings();
-    const urlToUse = savedSettings?.mcpServerUrl?.trim() || DEFAULT_MCP_SERVER_URL;
-    setServerUrl(urlToUse);
+    setServerUrl(DEFAULT_MCP_SERVER_URL);
 
     try {
       const token = await getToken();
-      const fetchedTools = await fetchMcpTools(urlToUse, token);
+      const fetchedTools = await fetchMcpTools(DEFAULT_MCP_SERVER_URL, token);
       setTools(fetchedTools || []);
     } catch (err: any) {
       console.error('Failed to load MCP tools:', err);

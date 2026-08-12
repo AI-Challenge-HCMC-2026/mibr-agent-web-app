@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { CHAT_HISTORY_API_HOST } from '../../lib/chatHistoryApi';
+import { getChatHistoryApiHost } from '../../lib/chatHistoryApi';
 import './ApiDocuments.css';
 
 interface ApiDocumentsProps {
@@ -26,7 +26,7 @@ interface SchemaDetailsProps {
   compact?: boolean;
 }
 
-const API_HOST = CHAT_HISTORY_API_HOST;
+const API_HOST = getChatHistoryApiHost();
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'];
 
 const resolveRef = (refStr: string | undefined, rootObj: any): any => {
