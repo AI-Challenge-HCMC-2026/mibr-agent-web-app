@@ -31,3 +31,4 @@ graphify-out
 *.sw?
 .agents
 .claude
+skills-lock.json

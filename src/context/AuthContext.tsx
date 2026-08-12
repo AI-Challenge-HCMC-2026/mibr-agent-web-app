@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { authClient } from '../lib/authClient';
+import { supabase } from '../lib/authClient';
 
 export interface User {
   id: string;
@@ -21,29 +21,34 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const getCookieToken = (): string | null => {
-  if (typeof document === 'undefined') return null;
-  const cookies = document.cookie.split(';');
-  for (let c of cookies) {
-    const [name, val] = c.trim().split('=');
-    if (
-      name === 'better-auth.session_token' ||
-      name === 'session_token' ||
-      name === 'auth_token' ||
-      name === 'jwt' ||
-      name === 'token'
-    ) {
-      return decodeURIComponent(val || '');
-    }
-  }
-  return null;
-};
+const NOT_ALLOWED_MESSAGE = 'Tài khoản không được cấp quyền truy cập vào hệ thống';
+
+const toUser = (u: { id: string; email?: string | null; user_metadata?: Record<string, any> }): User => ({
+  id: u.id,
+  email: u.email || '',
+  name: u.user_metadata?.name || u.user_metadata?.full_name || '',
+  image: u.user_metadata?.avatar_url || u.user_metadata?.picture || '',
+});
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const checkUserAllowed = async (email: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.rpc('check_user_allowed', { p_email: email });
+      if (error) {
+        console.error('[AuthContext] check_user_allowed failed:', error);
+        return false;
+      }
+      return Boolean(data);
+    } catch (err) {
+      console.error('[AuthContext] check_user_allowed error:', err);
+      return false;
+    }
+  };
 
   const fetchSession = async () => {
     try {
@@ -54,70 +59,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (urlError) {
         console.warn('[AuthContext] OAuth URL Error detected:', urlError);
-        setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
+        setAuthError(NOT_ALLOWED_MESSAGE);
         window.history.replaceState({}, document.title, window.location.pathname);
       }
 
-      const res = await authClient.getSession();
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
 
-      if (res?.data?.user) {
-        const currentUser = res.data.user as User;
-        const sessionData = res.data.session as any;
-        const currentToken =
-          sessionData?.token ||
-          sessionData?.sessionToken ||
-          sessionData?.id ||
-          (res.data as any)?.token ||
-          getCookieToken();
-
+      if (session?.user) {
+        const currentUser = toUser(session.user);
         const email = (currentUser.email || '').toLowerCase().trim();
-        const domain = email.split('@')[1] || '';
 
-        const allowedDomainsRaw = import.meta.env.VITE_ALLOWED_DOMAINS as string | undefined;
-        const allowedEmailsRaw = import.meta.env.VITE_ALLOWED_EMAILS as string | undefined;
+        const isAllowed = await checkUserAllowed(email);
 
-        const allowedDomains = allowedDomainsRaw
-          ? allowedDomainsRaw.split(',').map((d) => d.trim().toLowerCase()).filter(Boolean)
-          : [];
-        const allowedEmails = allowedEmailsRaw
-          ? allowedEmailsRaw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
-          : [];
-
-        let isWhitelisted = true;
-        const hasDomainFilter = allowedDomains.length > 0;
-        const hasEmailFilter = allowedEmails.length > 0;
-
-        if (hasDomainFilter || hasEmailFilter) {
-          const domainMatches = hasDomainFilter && allowedDomains.includes(domain);
-          const emailMatches = hasEmailFilter && allowedEmails.includes(email);
-
-          if (hasDomainFilter && hasEmailFilter) {
-            isWhitelisted = domainMatches || emailMatches;
-          } else if (hasDomainFilter) {
-            isWhitelisted = domainMatches;
-          } else if (hasEmailFilter) {
-            isWhitelisted = emailMatches;
-          }
-        }
-
-        if (!isWhitelisted) {
-          console.warn('[AuthContext] User email is not whitelisted in env:', email);
-          await authClient.signOut();
+        if (!isAllowed) {
+          console.warn('[AuthContext] User email is not in allowed_users:', email);
+          await supabase.auth.signOut();
           setUser(null);
           setToken(null);
-          setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
+          setAuthError(NOT_ALLOWED_MESSAGE);
           return;
         }
 
         setUser(currentUser);
-        setToken(currentToken);
+        setToken(session.access_token);
         setAuthError(null);
       } else {
         setUser(null);
         setToken(null);
       }
     } catch (err) {
-      console.error('Failed to retrieve session from Neon Auth:', err);
+      console.error('Failed to retrieve session from Supabase Auth:', err);
       setUser(null);
       setToken(null);
     } finally {
@@ -127,50 +99,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     fetchSession();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const currentUser = toUser(session.user);
+        setUser(currentUser);
+        setToken(session.access_token);
+        setAuthError(null);
+      } else {
+        setUser(null);
+        setToken(null);
+      }
+    });
+
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
   }, []);
 
   const getToken = async (): Promise<string | null> => {
     try {
-      const res = await authClient.getSession();
-      const sessionData = res?.data?.session as any;
-      const t =
-        sessionData?.token ||
-        sessionData?.sessionToken ||
-        sessionData?.id ||
-        (res?.data as any)?.token ||
-        getCookieToken() ||
-        token;
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      if (!session) return null;
 
-      if (t && t !== token) {
-        setToken(t);
+      const expiresAt = session.expires_at;
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (expiresAt && expiresAt - nowSec < 60) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        if (refreshed.session?.access_token) {
+          setToken(refreshed.session.access_token);
+          return refreshed.session.access_token;
+        }
       }
-      return t;
+
+      if (session.access_token !== token) {
+        setToken(session.access_token);
+      }
+      return session.access_token;
     } catch (err) {
       console.error('Failed to get token:', err);
-      return token || getCookieToken();
+      return token;
     }
   };
 
   const signInWithGoogle = async () => {
     try {
       setAuthError(null);
-      const res = await authClient.signIn.social({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        callbackURL: `${window.location.origin}/chat`,
+        options: {
+          redirectTo: `${window.location.origin}/chat`,
+        },
       });
 
-      if (res?.error) {
-        setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
+      if (error) {
+        setAuthError(NOT_ALLOWED_MESSAGE);
       }
     } catch (err) {
       console.error('Google Sign-in error:', err);
-      setAuthError('Tài khoản không được cấp quyền truy cập vào hệ thống');
+      setAuthError(NOT_ALLOWED_MESSAGE);
     }
   };
 
   const signOut = async () => {
     try {
-      await authClient.signOut();
+      await supabase.auth.signOut();
     } catch (err) {
       console.error('Sign-out error:', err);
     } finally {
@@ -198,4 +192,3 @@ export const useAuth = () => {
   }
   return context;
 };
-

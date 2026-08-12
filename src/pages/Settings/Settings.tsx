@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { supabaseRestBaseUrl } from '../../lib/authClient';
 import { DEFAULT_MCP_SERVER_URL } from '../../lib/mcpClient';
 import './Settings.css';
 
@@ -62,7 +63,7 @@ export const SettingsContent: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const apiBaseUrl = 'https://ep-divine-union-azkd67d3.apirest.c-3.ap-southeast-1.aws.neon.tech/mibr/rest/v1';
+  const apiBaseUrl = supabaseRestBaseUrl();
 
   // Load existing settings on mount
   useEffect(() => {

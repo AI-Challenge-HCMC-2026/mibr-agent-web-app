@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.16.0",
-    "@neondatabase/neon-js": "^0.6.2-beta",
+    "@supabase/supabase-js": "^2.49.4",
     "i": "^0.3.7",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

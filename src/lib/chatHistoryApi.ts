@@ -1,14 +1,14 @@
 /**
- * Client cho nhóm API "Chat History & Agent Operations" của
- * AI Challenge Search Engine (https://ai-challenge-search-engine.onrender.com/docs).
+ * Client cho nhóm API "Chat History & Agent Operations".
  *
- * Đồng bộ theo OpenAPI spec (openapi 3.1.0, title "AI Challenge Search Engine API"):
- * https://ai-challenge-search-engine.onrender.com/api/v1/openapi.json
+ * Backend được chạy như một Supabase Edge Function (`chat-api`):
+ * GET/POST/DELETE /chat/sessions, /chat/messages, /chat/history
+ * Xác thực bằng Supabase JWT (Bearer token).
  */
 
-export const CHAT_HISTORY_API_HOST = 'https://ai-challenge-search-engine.onrender.com';
-export const CHAT_HISTORY_API_BASE = `${CHAT_HISTORY_API_HOST}/api/v1`;
-export const CHAT_HISTORY_OPENAPI_URL = `${CHAT_HISTORY_API_BASE}/openapi.json`;
+export const CHAT_HISTORY_API_HOST = 'https://upstbmubljmmuqoslmoj.supabase.co';
+export const CHAT_HISTORY_API_BASE = `${CHAT_HISTORY_API_HOST}/functions/v1/chat-api`;
+export const CHAT_HISTORY_OPENAPI_URL = '';
 
 export interface ChatSessionDto {
   session_id: string;

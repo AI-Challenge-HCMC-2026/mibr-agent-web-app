@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { supabaseRestBaseUrl } from '../../lib/authClient';
 import '../../pages/Chat/Chat.css';
 
 export interface ChatSession {
@@ -60,7 +61,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
         const token = await getToken();
         if (!token) return;
         const res = await fetch(
-          `https://ep-divine-union-azkd67d3.apirest.c-3.ap-southeast-1.aws.neon.tech/mibr/rest/v1/user_settings?user_id=eq.${user.id}`,
+          `${supabaseRestBaseUrl()}/user_settings?user_id=eq.${user.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.ok) {
@@ -75,7 +76,7 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
                 provider: config.provider || 'gemini',
                 apikey: config.apikey || '',
                 model: parsed.model || 'gemini-3.5-flash-lite',
-                mcpServerUrl: parsed.mcpServerUrl || 'https://ai-challenge-search-engine.onrender.com/mcp',
+                mcpServerUrl: parsed.mcpServerUrl || 'https://opossum-excuse-spinning.ngrok-free.dev/mcp/',
                 enableMcp: parsed.enableMcp !== undefined ? Boolean(parsed.enableMcp) : true,
                 enableReasoning: parsed.enableReasoning !== undefined ? Boolean(parsed.enableReasoning) : true,
               })

@@ -1,12 +1,15 @@
-import { createAuthClient } from '@neondatabase/neon-js/auth';
+import { createClient } from '@supabase/supabase-js';
 
-const neonAuthUrl = (import.meta.env.VITE_NEON_AUTH_URL as string | undefined) || '';
+const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string | undefined) || '';
+const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || '';
 
-if (!neonAuthUrl) {
-  console.warn('VITE_NEON_AUTH_URL is not set in environment variables.');
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY is not set in environment variables.');
 }
 
-export const authClient = createAuthClient(neonAuthUrl);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-
-
+/** Base URL for Supabase PostgREST API (e.g. .../rest/v1). */
+export const supabaseRestBaseUrl = (): string => {
+  return `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
+};

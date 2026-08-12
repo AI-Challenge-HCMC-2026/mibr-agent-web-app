@@ -20,7 +20,7 @@ export interface McpToolCallResult {
   [key: string]: any;
 }
 
-export const DEFAULT_MCP_SERVER_URL = 'https://ai-challenge-search-engine.onrender.com/mcp/';
+export const DEFAULT_MCP_SERVER_URL = 'https://opossum-excuse-spinning.ngrok-free.dev/mcp/';
 
 /**
  * Clean up JSON schema to fit Google Gemini API functionDeclarations format
