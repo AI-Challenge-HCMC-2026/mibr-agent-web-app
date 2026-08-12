@@ -8,8 +8,3 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-/** Base URL for Supabase PostgREST API (e.g. .../rest/v1). */
-export const supabaseRestBaseUrl = (): string => {
-  return `${supabaseUrl.replace(/\/$/, '')}/rest/v1`;
-};

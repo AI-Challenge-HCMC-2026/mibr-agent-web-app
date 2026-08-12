@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { supabaseRestBaseUrl } from '../../lib/authClient';
 import './Settings.css';
 
 export interface UserSettingsData {
@@ -13,6 +12,10 @@ export interface UserSettingsData {
 
 const SETTINGS_LOCAL_STORAGE_KEY = 'mibr_user_gemini_api_key';
 const SETTINGS_FULL_LOCAL_STORAGE_KEY = 'mibr_user_settings';
+
+const USER_SETTINGS_API_BASE = `${
+  (import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')
+}/functions/v1/user-settings`;
 
 export const getStoredGeminiApiKey = (): string => {
   return localStorage.getItem(SETTINGS_LOCAL_STORAGE_KEY) || '';
@@ -60,8 +63,6 @@ export const SettingsContent: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const apiBaseUrl = supabaseRestBaseUrl();
-
   // Load existing settings on mount
   useEffect(() => {
     const fetchSettings = async () => {
@@ -84,7 +85,7 @@ export const SettingsContent: React.FC = () => {
 
       try {
         const token = await getToken();
-        const response = await fetch(`${apiBaseUrl}/user_settings?user_id=eq.${user.id}`, {
+        const response = await fetch(`${USER_SETTINGS_API_BASE}/`, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${token}`,
@@ -93,42 +94,39 @@ export const SettingsContent: React.FC = () => {
         });
 
         if (response.ok) {
-          const data = await response.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const userConfig = data[0];
-            if (userConfig.apikey) {
-              setApikey(userConfig.apikey);
-              localStorage.setItem(SETTINGS_LOCAL_STORAGE_KEY, userConfig.apikey);
-            }
-            if (userConfig.settings) {
-              const parsedSettings =
-                typeof userConfig.settings === 'string'
-                  ? JSON.parse(userConfig.settings)
-                  : userConfig.settings;
+          const userConfig = await response.json();
+          if (userConfig && userConfig.apikey) {
+            setApikey(userConfig.apikey);
+            localStorage.setItem(SETTINGS_LOCAL_STORAGE_KEY, userConfig.apikey);
+          }
+          if (userConfig && userConfig.settings) {
+            const parsedSettings =
+              typeof userConfig.settings === 'string'
+                ? JSON.parse(userConfig.settings)
+                : userConfig.settings;
 
-              const loadedModel =
-                parsedSettings.model && parsedSettings.model.startsWith('gemini-')
-                  ? parsedSettings.model
-                  : 'gemini-3.5-flash-lite';
+            const loadedModel =
+              parsedSettings.model && parsedSettings.model.startsWith('gemini-')
+                ? parsedSettings.model
+                : 'gemini-3.5-flash-lite';
 
-              const loadedEnableMcp = parsedSettings.enableMcp !== undefined ? Boolean(parsedSettings.enableMcp) : true;
-              const loadedEnableReasoning = parsedSettings.enableReasoning !== undefined ? Boolean(parsedSettings.enableReasoning) : true;
+            const loadedEnableMcp = parsedSettings.enableMcp !== undefined ? Boolean(parsedSettings.enableMcp) : true;
+            const loadedEnableReasoning = parsedSettings.enableReasoning !== undefined ? Boolean(parsedSettings.enableReasoning) : true;
 
-              setModel(loadedModel);
-              setEnableMcp(loadedEnableMcp);
-              setEnableReasoning(loadedEnableReasoning);
+            setModel(loadedModel);
+            setEnableMcp(loadedEnableMcp);
+            setEnableReasoning(loadedEnableReasoning);
 
-              localStorage.setItem(
-                SETTINGS_FULL_LOCAL_STORAGE_KEY,
-                JSON.stringify({
-                  provider: 'gemini',
-                  apikey: userConfig.apikey || '',
-                  model: loadedModel,
-                  enableMcp: loadedEnableMcp,
-                  enableReasoning: loadedEnableReasoning,
-                })
-              );
-            }
+            localStorage.setItem(
+              SETTINGS_FULL_LOCAL_STORAGE_KEY,
+              JSON.stringify({
+                provider: 'gemini',
+                apikey: userConfig.apikey || '',
+                model: loadedModel,
+                enableMcp: loadedEnableMcp,
+                enableReasoning: loadedEnableReasoning,
+              })
+            );
           }
         }
       } catch (err) {
@@ -151,17 +149,16 @@ export const SettingsContent: React.FC = () => {
     try {
       const token = await getToken();
       const payload = {
-        p_user_id: user.id,
-        p_provider: 'gemini',
-        p_apikey: apikey.trim(),
-        p_settings: {
+        provider: 'gemini',
+        apikey: apikey.trim(),
+        settings: {
           model: model,
           enableMcp: enableMcp,
           enableReasoning: enableReasoning,
         },
       };
 
-      const response = await fetch(`${apiBaseUrl}/rpc/update_user_settings`, {
+      const response = await fetch(`${USER_SETTINGS_API_BASE}/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

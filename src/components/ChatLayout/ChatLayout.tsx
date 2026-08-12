@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { supabaseRestBaseUrl } from '../../lib/authClient';
 import '../../pages/Chat/Chat.css';
 
 export interface ChatSession {
@@ -61,14 +60,13 @@ export const ChatLayout: React.FC<ChatLayoutProps> = ({
         const token = await getToken();
         if (!token) return;
         const res = await fetch(
-          `${supabaseRestBaseUrl()}/user_settings?user_id=eq.${user.id}`,
+          `${(import.meta.env.VITE_SUPABASE_URL as string).replace(/\/$/, '')}/functions/v1/user-settings/`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const config = data[0];
-            const parsed = typeof config.settings === 'string' ? JSON.parse(config.settings) : config.settings || {};
+          const config = await res.json();
+          if (config && config.settings) {
+            const parsed = typeof config.settings === 'string' ? JSON.parse(config.settings) : config.settings;
             localStorage.setItem('mibr_user_gemini_api_key', config.apikey || '');
             localStorage.setItem(
               'mibr_user_settings',
