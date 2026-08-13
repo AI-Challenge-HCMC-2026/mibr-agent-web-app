@@ -72,6 +72,49 @@ export function parseRateLimitError(error: unknown): { retryAfterSeconds: number
   return { retryAfterSeconds: Math.max(1, Math.ceil(seconds || 30)) };
 }
 
+// Transient 503 (UNAVAILABLE): the model is overloaded. Spikes are usually
+// brief, so the call is worth retrying with a small backoff before giving up.
+function isUnavailableError(error: unknown): boolean {
+  const raw =
+    error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  const anyErr = error as any;
+  const code = anyErr?.status ?? anyErr?.code ?? anyErr?.error?.code;
+  return (
+    code === 503 ||
+    code === 'UNAVAILABLE' ||
+    /UNAVAILABLE|high demand|temporarily unavailable|"code"\s*:\s*503/i.test(raw)
+  );
+}
+
+const UNAVAILABLE_RETRY_COUNT = 3;
+const UNAVAILABLE_RETRY_DELAY_MS = 2000;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Runs fn, retrying only when it fails with a transient 503. canRetry lets the
+// caller veto retrying (e.g. once a stream has already emitted chunks).
+async function retryOnUnavailable<T>(
+  fn: () => Promise<T>,
+  maxRetries: number,
+  canRetry: (err: unknown) => boolean = isUnavailableError
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      if (!canRetry(err) || attempt >= maxRetries) break;
+      const delayMs = UNAVAILABLE_RETRY_DELAY_MS * (attempt + 1);
+      console.warn(
+        `[Gemini] Model overloaded (503), retrying in ${delayMs}ms (attempt ${attempt + 1}/${maxRetries})`
+      );
+      await sleep(delayMs);
+    }
+  }
+  throw lastErr;
+}
+
 export async function sendGeminiChatMessage(
   optionsOrHistory: ChatMessageContext[] | SendGeminiChatOptions,
   newMessageTextArg?: string,
@@ -280,8 +323,16 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
             : msgPayload;
 
       try {
-        const stream = await chat.sendMessageStream(sendParam as any);
+        // Stream with retry on 503. Once chunks have been emitted, we cannot
+        // restart because accumulatedText would duplicate – hence canRetry.
+        let streamedChunks = false;
+        const stream = await retryOnUnavailable(
+          () => chat.sendMessageStream(sendParam as any),
+          UNAVAILABLE_RETRY_COUNT,
+          (err) => isUnavailableError(err) && !streamedChunks
+        );
         for await (const chunk of stream) {
+          streamedChunks = true;
           lastChunk = chunk;
           collectReasoning(chunk);
           collectUsage(chunk);
@@ -298,9 +349,17 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
           rateLimitInfo = streamRateLimit;
           throw streamErr;
         }
-        console.warn('[Gemini Stream] Stream failed, falling back to standard response:', streamErr);
+        if (isUnavailableError(streamErr)) {
+          // Model is overloaded – fall through to standard sendMessage below
+          console.warn('[Gemini Stream] Stream failed (503), falling back to standard response');
+        } else {
+          console.warn('[Gemini Stream] Stream failed, falling back to standard response:', streamErr);
+        }
         try {
-          const singleRes = await chat.sendMessage(sendParam as any);
+          const singleRes = await retryOnUnavailable(
+            () => chat.sendMessage(sendParam as any),
+            UNAVAILABLE_RETRY_COUNT
+          );
           lastChunk = singleRes;
           collectReasoning(singleRes);
           collectUsage(singleRes);
@@ -392,7 +451,7 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
       if (executedToolCalls.length > 0 || extractedReasoning.length > 0) {
         finalText = '';
       } else {
-        finalText = 'Không có phản hồi từ Gemini AI.';
+        finalText = 'Không có phản hồi từ Gemini AI (model hiện đang quá tải, vui lòng thử lại sau ít phút).';
       }
     }
 
