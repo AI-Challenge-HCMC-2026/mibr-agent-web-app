@@ -1,9 +1,18 @@
 import { extractUser, AuthError } from './_auth.ts';
 
+// Auth is via Bearer token (verified by extractUser), so a wildcard origin is
+// safe; every response must carry CORS headers or browsers will block it.
+const corsHeaders = () => ({
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Max-Age': '86400',
+});
+
 const json = (data: unknown, status = 200): Response =>
   new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
   });
 
 const badRequest = (message: string): Response => json({ error: message }, 400);
@@ -26,7 +35,27 @@ Deno.serve(async (req: Request) => {
   try {
     // routes before auth so OPTIONS/CORS and health checks don't need a token
     if (method === 'OPTIONS') {
-      return new Response(null, { status: 204 });
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
+    // GET /openapi — proxy the Supabase Management API OpenAPI spec (no CORS
+    // on the management endpoint itself), so the docs page can fetch it from
+    // the browser.
+    if (method === 'GET' && path === 'openapi') {
+      const origin = `${Deno.env.get('SUPABASE_URL')}/api/v1/openapi.json`;
+      const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      const upstream = await fetch(origin, {
+        headers: { Authorization: `Bearer ${serviceRoleKey}` },
+      });
+      const body = await upstream.text();
+      return new Response(body, {
+        status: upstream.status,
+        headers: {
+          ...corsHeaders(),
+          'Content-Type': 'application/json',
+          'Cache-Control': 'public, max-age=3600',
+        },
+      });
     }
 
     const { userId, supabase } = await extractUser(req);
