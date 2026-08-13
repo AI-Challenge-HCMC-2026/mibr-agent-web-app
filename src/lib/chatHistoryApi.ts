@@ -9,7 +9,7 @@
 const CHAT_HISTORY_API_HOST =
   (import.meta.env.VITE_SUPABASE_URL as string | undefined) || '';
 export const CHAT_HISTORY_API_BASE = CHAT_HISTORY_API_HOST
-  ? `${CHAT_HISTORY_API_HOST.replace(/\/$/, '')}/functions/v1/chat-api-cors-test`
+  ? `${CHAT_HISTORY_API_HOST.replace(/\/$/, '')}/functions/v1/chat-api`
   : '';
 export const CHAT_HISTORY_OPENAPI_URL = '';
 

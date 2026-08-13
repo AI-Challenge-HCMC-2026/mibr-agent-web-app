@@ -1,7 +1,6 @@
 import { extractUser, AuthError } from './_auth.ts';
 
-// Auth is via Bearer token (verified by extractUser), so a wildcard origin is
-// safe; every response must carry CORS headers or browsers will block it.
+// CORS headers must be present on ALL responses for browser requests to succeed
 const corsHeaders = () => ({
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
@@ -30,17 +29,15 @@ interface CreateMessagePayload {
 Deno.serve(async (req: Request) => {
   const method = req.method;
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/functions\/v1\/chat-api/, '').replace(/^\/+/, '');
+  const path = url.pathname.replace(/^\/functions\/v1\/chat-api-cors-test/, '').replace(/^\/+/, '');
 
   try {
-    // routes before auth so OPTIONS/CORS and health checks don't need a token
+    // Handle OPTIONS preflight — no auth required
     if (method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders() });
     }
 
-    // GET /openapi — proxy the Supabase Management API OpenAPI spec (no CORS
-    // on the management endpoint itself), so the docs page can fetch it from
-    // the browser.
+    // GET /openapi — proxy the Management API OpenAPI spec (it has no CORS)
     if (method === 'GET' && path === 'openapi') {
       const origin = `${Deno.env.get('SUPABASE_URL')}/api/v1/openapi.json`;
       const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
@@ -149,7 +146,7 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'Forbidden' }, 403);
       }
 
-      // ensure the session exists (created client-side, may not be persisted yet)
+      // ensure the session exists
       const { data: existing } = await supabase
         .from('chat_sessions')
         .select('session_id')
@@ -165,7 +162,6 @@ Deno.serve(async (req: Request) => {
         });
         if (upsertError) return json({ error: upsertError.message }, 500);
       } else if (title) {
-        // rename support: title rides along on message saves
         const { error: titleError } = await supabase
           .from('chat_sessions')
           .update({ title })

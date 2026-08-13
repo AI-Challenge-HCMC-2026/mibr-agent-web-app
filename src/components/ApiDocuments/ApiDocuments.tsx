@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getChatHistoryApiHost } from '../../lib/chatHistoryApi';
+import { getChatHistoryApiHost, CHAT_HISTORY_API_BASE } from '../../lib/chatHistoryApi';
 import './ApiDocuments.css';
 
 interface ApiDocumentsProps {
@@ -124,7 +124,9 @@ export const ApiDocuments: React.FC<ApiDocumentsProps> = () => {
   const [expandedPath, setExpandedPath] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<string | null>(null);
 
-  const documentUrl = `${API_HOST}/api/v1/openapi.json`;
+  const documentUrl = CHAT_HISTORY_API_BASE
+    ? `${CHAT_HISTORY_API_BASE}/openapi`
+    : `${API_HOST}/api/v1/openapi.json`;
   const fetchData = async () => {
     setLoading(true);
     setError(null);
@@ -132,11 +134,13 @@ export const ApiDocuments: React.FC<ApiDocumentsProps> = () => {
     try {
       const token = await getToken();
       setActiveToken(token);
+      // The edge-function proxy is public (it fetches with the service-role
+      // key server-side); no Authorization header needed, and the management
+      // API itself can't be reached from the browser (no CORS).
       const response = await fetch(documentUrl, {
         method: 'GET',
         headers: {
           Accept: 'application/openapi+json, application/json, */*',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
       const responseText = await response.text();
