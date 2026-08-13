@@ -326,7 +326,7 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
         // Stream with retry on 503. Once chunks have been emitted, we cannot
         // restart because accumulatedText would duplicate – hence canRetry.
         let streamedChunks = false;
-        const stream = await retryOnUnavailable(
+        const stream: any = await retryOnUnavailable(
           () => chat.sendMessageStream(sendParam as any),
           UNAVAILABLE_RETRY_COUNT,
           (err) => isUnavailableError(err) && !streamedChunks
@@ -356,7 +356,7 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
           console.warn('[Gemini Stream] Stream failed, falling back to standard response:', streamErr);
         }
         try {
-          const singleRes = await retryOnUnavailable(
+          const singleRes: any = await retryOnUnavailable(
             () => chat.sendMessage(sendParam as any),
             UNAVAILABLE_RETRY_COUNT
           );
