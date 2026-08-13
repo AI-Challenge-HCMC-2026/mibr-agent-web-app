@@ -293,10 +293,15 @@ Khi người dùng hỏi về khả năng MCP, các công cụ hiện có, hoặ
       const collected: Array<{ name: string; args: any }> = [];
       if (!chunkObj) return collected;
 
-      if (Array.isArray(chunkObj.functionCalls)) {
+      // The SDK exposes a top-level `functionCalls` convenience array that is
+      // derived from `candidates[0].content.parts`. Checking BOTH sources
+      // causes every call to be counted twice. Prefer the shortcut when it
+      // exists; only fall back to scanning raw parts when it is absent.
+      if (Array.isArray(chunkObj.functionCalls) && chunkObj.functionCalls.length > 0) {
         for (const fc of chunkObj.functionCalls) {
           if (fc?.name) collected.push({ name: fc.name, args: fc.args || {} });
         }
+        return collected;
       }
 
       const parts = chunkObj.candidates?.[0]?.content?.parts || chunkObj.parts;

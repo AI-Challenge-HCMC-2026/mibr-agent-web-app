@@ -29,7 +29,7 @@ interface CreateMessagePayload {
 Deno.serve(async (req: Request) => {
   const method = req.method;
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/functions\/v1\/chat-api/, '').replace(/^\/+/, '');
+  const path = url.pathname.replace(/^(\/functions\/v1)?\/chat-api/, '').replace(/^\/+/, '');
 
   try {
     // Handle OPTIONS preflight — no auth required
