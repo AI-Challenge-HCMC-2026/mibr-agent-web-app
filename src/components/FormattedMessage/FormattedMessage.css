@@ -455,6 +455,136 @@
   text-overflow: ellipsis;
 }
 
+/* ─── Image Gallery Grid ─────────────────────────────────────────────────── */
+
+.md-image-gallery {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+  border-radius: 14px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+/* 2 images: side-by-side */
+.md-image-gallery--2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* 3 images: first large on left, two stacked on right */
+.md-image-gallery--3 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+.md-image-gallery--3 > .md-image-figure--gallery:first-child {
+  grid-row: 1 / 3;
+}
+
+/* 4+ images: 2-column grid */
+.md-image-gallery--4 {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* Gallery figure overrides */
+.md-image-figure--gallery {
+  margin: 0;
+  border-radius: 0;
+  border: none;
+  aspect-ratio: auto;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.md-image-figure--gallery:hover {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+/* Gallery images fill their cell with cover */
+.md-image--gallery {
+  width: 100%;
+  height: 100%;
+  min-height: 120px;
+  max-height: 260px;
+  object-fit: cover;
+  border-radius: 0;
+}
+
+/* Rounded corners on outer edges of the gallery */
+.md-image-gallery > .md-image-figure--gallery:first-child {
+  border-top-left-radius: 14px;
+}
+
+.md-image-gallery--2 > .md-image-figure--gallery:nth-child(2) {
+  border-top-right-radius: 14px;
+  border-bottom-right-radius: 14px;
+}
+
+.md-image-gallery--2 > .md-image-figure--gallery:first-child {
+  border-bottom-left-radius: 14px;
+}
+
+.md-image-gallery--3 > .md-image-figure--gallery:first-child {
+  border-bottom-left-radius: 14px;
+}
+
+.md-image-gallery--3 > .md-image-figure--gallery:nth-child(2) {
+  border-top-right-radius: 14px;
+}
+
+.md-image-gallery--3 > .md-image-figure--gallery:nth-child(3) {
+  border-bottom-right-radius: 14px;
+}
+
+.md-image-gallery--4 > .md-image-figure--gallery:nth-child(2) {
+  border-top-right-radius: 14px;
+}
+
+.md-image-gallery--4 > .md-image-figure--gallery:nth-child(odd):last-child,
+.md-image-gallery--4 > .md-image-figure--gallery:nth-last-child(2):nth-child(odd) {
+  border-bottom-left-radius: 14px;
+}
+
+.md-image-gallery--4 > .md-image-figure--gallery:nth-child(even):last-child {
+  border-bottom-right-radius: 14px;
+}
+
+/* Gallery caption - smaller and overlaid at bottom */
+.md-image-figure--gallery .md-image-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.6));
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Gallery hover overlay */
+.md-image-figure--gallery .md-image-overlay {
+  border-radius: 0;
+}
+
+.md-image-figure--gallery:hover {
+  filter: brightness(1.08);
+}
+
+/* Responsive: stack on very small screens */
+@media (max-width: 380px) {
+  .md-image-gallery--2,
+  .md-image-gallery--3,
+  .md-image-gallery--4 {
+    grid-template-columns: 1fr;
+  }
+
+  .md-image-gallery--3 > .md-image-figure--gallery:first-child {
+    grid-row: auto;
+  }
+}
+
 /* ─── Lightbox Modal ──────────────────────────────────────────────────────── */
 
 .md-lightbox {

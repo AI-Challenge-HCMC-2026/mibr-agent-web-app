@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -94,8 +94,9 @@ const CodeBlock: React.FC<{ language: string; code: string }> = ({ language, cod
 const LightboxImage: React.FC<{
   src?: string;
   alt?: string;
+  inGallery?: boolean;
   onOpen: (src: string, alt: string) => void;
-}> = ({ src, alt, onOpen }) => {
+}> = ({ src, alt, inGallery, onOpen }) => {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -103,7 +104,7 @@ const LightboxImage: React.FC<{
 
   return (
     <figure
-      className="md-image-figure"
+      className={`md-image-figure${inGallery ? ' md-image-figure--gallery' : ''}`}
       onClick={() => onOpen(src, alt || '')}
       role="button"
       tabIndex={0}
@@ -115,7 +116,7 @@ const LightboxImage: React.FC<{
       }}
     >
       <img
-        className={`md-image${loaded ? ' md-image--loaded' : ''}`}
+        className={`md-image${loaded ? ' md-image--loaded' : ''}${inGallery ? ' md-image--gallery' : ''}`}
         src={src}
         alt={alt || ''}
         onLoad={() => setLoaded(true)}
@@ -135,6 +136,60 @@ const LightboxImage: React.FC<{
       {alt && <figcaption className="md-image-caption">{alt}</figcaption>}
     </figure>
   );
+};
+
+// ─── Helpers: detect image-only paragraphs & group consecutive images ────────
+
+/** Check if a React child is a rendered image element (from our img override). */
+const isImageElement = (child: React.ReactNode): boolean => {
+  if (!React.isValidElement(child)) return false;
+  // Our img override renders <LightboxImage>, which produces <figure class="md-image-figure">
+  // ReactMarkdown passes { node, src, alt, ... } to our `img` component override.
+  // The child here is the return value of our `img:` component, which is <LightboxImage>.
+  const el = child as React.ReactElement<any>;
+  return el.type === LightboxImage || el.props?.src !== undefined;
+};
+
+/**
+ * Pre-process markdown to group consecutive image-only lines into a single
+ * paragraph so ReactMarkdown renders them together (enabling gallery layout).
+ *
+ * Markdown like:
+ *   ![a](url1)
+ *   ![b](url2)
+ *   ![c](url3)
+ *
+ * becomes a single paragraph with all three images on one line separated by
+ * newlines inside the same block, which ReactMarkdown keeps as siblings.
+ */
+const groupConsecutiveImages = (md: string): string => {
+  const lines = md.split('\n');
+  const result: string[] = [];
+  let imageBuffer: string[] = [];
+
+  const flushImages = () => {
+    if (imageBuffer.length > 1) {
+      // Join with a space so they stay in one paragraph
+      result.push(imageBuffer.join(' '));
+    } else if (imageBuffer.length === 1) {
+      result.push(imageBuffer[0]);
+    }
+    imageBuffer = [];
+  };
+
+  const imageLineRe = /^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/;
+
+  for (const line of lines) {
+    if (imageLineRe.test(line)) {
+      imageBuffer.push(line.trim());
+    } else {
+      flushImages();
+      result.push(line);
+    }
+  }
+  flushImages();
+
+  return result.join('\n');
 };
 
 // ─── Main FormattedMessage Component ─────────────────────────────────────────
@@ -163,6 +218,8 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
     };
   }, [lightbox, closeLightbox]);
 
+  const processedContent = useMemo(() => groupConsecutiveImages(content), [content]);
+
   if (!content) return null;
 
   return (
@@ -170,10 +227,30 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          // Paragraphs
-          p: ({ children }) => (
-            <p className="md-paragraph">{children}</p>
-          ),
+          // Paragraphs — detect image-only content for gallery layout
+          p: ({ children }) => {
+            const childArray = React.Children.toArray(children).filter(
+              (c) => !(typeof c === 'string' && c.trim() === '')
+            );
+            const imageChildren = childArray.filter(isImageElement);
+
+            // All children are images → render as gallery grid
+            if (imageChildren.length > 1 && imageChildren.length === childArray.length) {
+              return (
+                <div className={`md-image-gallery md-image-gallery--${Math.min(imageChildren.length, 4)}`}>
+                  {React.Children.map(children, (child) => {
+                    if (React.isValidElement(child) && isImageElement(child)) {
+                      const el = child as React.ReactElement<any>;
+                      return <LightboxImage {...el.props} inGallery onOpen={openLightbox} />;
+                    }
+                    return child;
+                  })}
+                </div>
+              );
+            }
+
+            return <p className="md-paragraph">{children}</p>;
+          },
 
           // Headings
           h1: ({ children }) => <h1 className="md-h1">{children}</h1>,
@@ -246,7 +323,7 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
           },
 
           // Images — click to open lightbox
-          img: ({ src, alt }) => (
+          img: ({ src, alt }: any) => (
             <LightboxImage src={src} alt={alt} onOpen={openLightbox} />
           ),
 
@@ -283,7 +360,7 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
           td: ({ children }) => <td className="md-td">{children}</td>,
         }}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
 
       {/* Lightbox overlay */}

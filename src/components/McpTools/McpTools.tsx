@@ -22,9 +22,18 @@ export const McpTools: React.FC<McpToolsProps> = ({ onSelectTool, onNavigateToSe
 
     setServerUrl(DEFAULT_MCP_SERVER_URL);
 
+    if (!DEFAULT_MCP_SERVER_URL || DEFAULT_MCP_SERVER_URL.trim() === '') {
+      setError('MCP Server URL chưa được cấu hình (VITE_MCP_SERVER_URL trống).');
+      setTools([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const token = await getToken();
+      console.log(`[McpTools] Loading tools from: ${DEFAULT_MCP_SERVER_URL}, token present: ${!!token}`);
       const fetchedTools = await fetchMcpTools(DEFAULT_MCP_SERVER_URL, token);
+      console.log(`[McpTools] Fetched ${fetchedTools?.length ?? 0} tools`);
       setTools(fetchedTools || []);
     } catch (err: any) {
       console.error('Failed to load MCP tools:', err);
