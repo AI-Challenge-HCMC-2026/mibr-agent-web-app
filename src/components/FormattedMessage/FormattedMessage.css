@@ -398,6 +398,36 @@
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
+.md-image-figure--broken {
+  cursor: default;
+  padding: 12px 16px;
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px dashed rgba(239, 68, 68, 0.25);
+  gap: 6px;
+}
+
+.md-image-broken {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f87171;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.md-image-broken-url {
+  font-size: 11px;
+  color: var(--text-secondary, #94a3b8);
+  word-break: break-all;
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
+.md-image-broken-url:hover {
+  opacity: 1;
+  color: #60a5fa;
+}
+
 .md-image {
   display: block;
   max-width: 100%;

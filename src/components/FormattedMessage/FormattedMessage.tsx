@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import './FormattedMessage.css';
 
 interface FormattedMessageProps {
@@ -100,7 +101,27 @@ const LightboxImage: React.FC<{
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  if (failed || !src) return null;
+  if (!src) return null;
+
+  // Show a visible broken-image fallback so the user knows an image was expected
+  if (failed) {
+    return (
+      <figure className={`md-image-figure md-image-figure--broken${inGallery ? ' md-image-figure--gallery' : ''}`}>
+        <div className="md-image-broken">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+            <circle cx="8.5" cy="8.5" r="1.5" />
+            <polyline points="21 15 16 10 5 21" />
+          </svg>
+          <span className="md-image-broken-text">Không tải được ảnh</span>
+        </div>
+        <a className="md-image-broken-url" href={src} target="_blank" rel="noopener noreferrer" title={src}>
+          {src.length > 60 ? `${src.slice(0, 58)}…` : src}
+        </a>
+        {alt && <figcaption className="md-image-caption">{alt}</figcaption>}
+      </figure>
+    );
+  }
 
   return (
     <figure
@@ -119,6 +140,8 @@ const LightboxImage: React.FC<{
         className={`md-image${loaded ? ' md-image--loaded' : ''}${inGallery ? ' md-image--gallery' : ''}`}
         src={src}
         alt={alt || ''}
+        loading="lazy"
+        referrerPolicy="no-referrer"
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />
@@ -151,16 +174,10 @@ const isImageElement = (child: React.ReactNode): boolean => {
 };
 
 /**
- * Pre-process markdown to group consecutive image-only lines into a single
- * paragraph so ReactMarkdown renders them together (enabling gallery layout).
- *
- * Markdown like:
- *   ![a](url1)
- *   ![b](url2)
- *   ![c](url3)
- *
- * becomes a single paragraph with all three images on one line separated by
- * newlines inside the same block, which ReactMarkdown keeps as siblings.
+ * Pre-process markdown to:
+ * 1. Convert bare image URLs (standalone line with .jpg/.png/.gif/.webp/etc.) to markdown images
+ * 2. Convert HTML <img> tags to markdown image syntax for consistent handling
+ * 3. Group consecutive image-only lines into a single paragraph (gallery layout)
  */
 const groupConsecutiveImages = (md: string): string => {
   const lines = md.split('\n');
@@ -178,11 +195,33 @@ const groupConsecutiveImages = (md: string): string => {
   };
 
   const imageLineRe = /^\s*!\[([^\]]*)\]\(([^)]+)\)\s*$/;
+  // Bare image URL on its own line (http(s)://...image extension or known image CDN patterns)
+  const bareImageUrlRe = /^\s*(https?:\/\/\S+\.(?:jpg|jpeg|png|gif|webp|svg|bmp|avif)(?:\?[^\s]*)?)\s*$/i;
+  // HTML <img> tag
+  const htmlImgRe = /^\s*<img\s+[^>]*src=["']([^"']+)["'][^>]*\/?>\s*$/i;
 
   for (const line of lines) {
+    // Already markdown image
     if (imageLineRe.test(line)) {
       imageBuffer.push(line.trim());
-    } else {
+    }
+    // Bare image URL → convert to markdown image
+    else if (bareImageUrlRe.test(line)) {
+      const match = line.match(bareImageUrlRe);
+      if (match) {
+        imageBuffer.push(`![](${match[1]})`);
+      }
+    }
+    // HTML <img> tag → convert to markdown image
+    else if (htmlImgRe.test(line)) {
+      const match = line.match(htmlImgRe);
+      if (match) {
+        const altMatch = line.match(/alt=["']([^"']*?)["']/i);
+        const altText = altMatch ? altMatch[1] : '';
+        imageBuffer.push(`![${altText}](${match[1]})`);
+      }
+    }
+    else {
       flushImages();
       result.push(line);
     }
@@ -226,6 +265,7 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
     <div className="formatted-message-body">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw]}
         components={{
           // Paragraphs — detect image-only content for gallery layout
           p: ({ children }) => {
