@@ -319,12 +319,29 @@ export const FormattedMessage: React.FC<FormattedMessageProps> = ({ content }) =
             </li>
           ),
 
-          // Links
+          // Links (with smart image autolink detection)
           a: ({ href, children }) => {
             const url = href || '';
             const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
             const childText = React.Children.toArray(children).join('');
-            const isBareUrl = childText === url;
+            const isBareUrl = childText === url || childText.trim() === shortenUrl(url);
+
+            // Check if link target is an image (including Cloudflare R2, S3 presigned URLs with query params)
+            const cleanPath = url.split('?')[0].split('#')[0];
+            const isImage =
+              /\.(?:jpg|jpeg|png|gif|webp|svg|bmp|avif)$/i.test(cleanPath) ||
+              /r2\.cloudflarestorage\.com/i.test(url) ||
+              /supabase\.co\/storage\/v1\/object/i.test(url);
+
+            if (isImage) {
+              return (
+                <LightboxImage
+                  src={url}
+                  alt={isBareUrl ? '' : childText}
+                  onOpen={openLightbox}
+                />
+              );
+            }
 
             if (isYouTube) {
               return (
